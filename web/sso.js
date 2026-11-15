@@ -4,12 +4,12 @@
    data-logout   "<METHOD> <path>"  (optional) -> after it succeeds, also sign out of the hub */
 (function () {
   var el = document.currentScript, id = el.dataset.service;
-  var hub = 'http://' + location.hostname + ':8090';
+  var hub = window.__HUB_ORIGIN__ || ('http://' + location.hostname + ':8090');
   if (new URLSearchParams(location.search).has('nosso')) return; // hub said it can't sign us in: show the normal login
   function bounce() {
     try { // loop guard: at most one bounce per 15 s per tab
       var t = +sessionStorage.getItem('hubSsoTried') || 0;
-      if (Date.now() - t < 15000) return;
+      if (Date.now() - t < (window.__HUB_GUARD_MS__ || 15000)) return;
       sessionStorage.setItem('hubSsoTried', String(Date.now()));
     } catch (e) {}
     location.replace(hub + '/go/' + id + '?sso=1');

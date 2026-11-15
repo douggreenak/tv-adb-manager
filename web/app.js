@@ -113,7 +113,7 @@ function showLogin(msg) {
     catch (x) { err.textContent = x.message; pw.select(); }
   };
   $("#app").replaceChildren(h("div", { class: "login-screen" }, h("form", { class: "login", onsubmit: go },
-    h("div", { class: "brand-mark" }, ic("tv")), h("h1", null, "TV Manager"),
+    h("div", { class: "brand-mark", style: "background:none;overflow:hidden" }, h("img", { src: "/favicon.svg", alt: "", style: "width:100%;height:100%;border-radius:inherit;display:block" })), h("h1", null, "TV Manager"),
     h("p", { class: "muted", style: "margin-bottom:22px" }, "Sign in to manage your TVs"),
     h("div", { class: "field" }, h("label", { for: "pw" }, "Password"), pw),
     err, h("button", { class: "btn primary", type: "submit" }, "Sign in"))));
@@ -144,7 +144,7 @@ function renderShell() {
     h("header", { class: "topbar" }, h("div", { class: "title" }, "TV Manager"),
       h("a", { class: "icon-btn appslink", href: hubUrl(), title: "Services hub \u2014 all apps", "aria-label": "Apps" }, ic("apps")),
       h("button", { class: "icon-btn", onclick: signOut, "aria-label": "Sign out" }, ic("logout"))),
-    h("nav", { class: "nav", "aria-label": "Main" }, h("div", { class: "brand-mark", title: "TV Manager" }, ic("tv")), items,
+    h("nav", { class: "nav", "aria-label": "Main" }, h("div", { class: "brand-mark", title: "TV Manager", style: "background:none;overflow:hidden" }, h("img", { src: "/favicon.svg", alt: "", style: "width:100%;height:100%;border-radius:inherit;display:block" })), items,
       h("div", { class: "nav-spacer" }), hubExtra, outExtra),
     h("div", { class: "content" }, h("main", { class: "main", id: "main" }))));
   renderFab();

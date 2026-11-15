@@ -1,16 +1,25 @@
 [Unit]
 Description=TV ADB Manager (web dashboard + last-input restore)
+Documentation=https://github.com/douggreenak/tv-adb-manager
 After=network-online.target
 Wants=network-online.target
+# never give up restarting, however often it crashes
+StartLimitIntervalSec=0
 
 [Service]
+Type=simple
+# Edit these three for your machine. The user must have a home directory: ~/.android/adbkey is
+# the key the TVs authorize, so always run as the same user.
 User=tvmanager
 WorkingDirectory=/opt/tv-adb-manager
 Environment=HOME=/var/lib/tvmanager
+Environment=PYTHONUNBUFFERED=1
 # Optional: Environment=TVM_PORT=8420  TVM_HOST=0.0.0.0  TVM_PASSWORD=...
 ExecStart=/usr/bin/python3 -m tvmanager
 Restart=always
-RestartSec=5
+RestartSec=3
+NoNewPrivileges=true
+TimeoutStopSec=10
 
 [Install]
 WantedBy=multi-user.target

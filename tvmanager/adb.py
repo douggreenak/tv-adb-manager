@@ -44,9 +44,12 @@ class Adb:
         return out if rc == 0 and out[:4] == b"\x89PNG" else None
 
     def screenrecord_argv(self, addr, size, bitrate):
-        """argv that streams the TV's screen as raw H.264 on stdout (screenrecord stops itself after 3 minutes)."""
-        return [self.binary, "-s", addr, "exec-out", "screenrecord", "--output-format=h264", "--size", size,
-                "--bit-rate", str(bitrate), "--time-limit", "180", "-"]
+        """argv that streams the TV's screen as raw H.264 on stdout (screenrecord stops itself after 3 minutes).
+        size=None lets the TV pick its native resolution."""
+        argv = [self.binary, "-s", addr, "exec-out", "screenrecord", "--output-format=h264"]
+        if size:                       # omitted on the retry: some TVs only accept their own native size
+            argv += ["--size", size]
+        return argv + ["--bit-rate", str(bitrate), "--time-limit", "180", "-"]
 
     def install(self, addr, path, timeout=600):
         rc, out, err = self._run(["-s", addr, "install", "-r", path], timeout=timeout)

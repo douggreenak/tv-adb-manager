@@ -450,14 +450,20 @@ def r_live(h, m, q):
     preset = livemod.PRESETS.get(name)
     if not preset:
         raise ApiError(400, "quality must be low, medium or high")
-    try:
-        sess = a.live.open(d["id"], a.adb.screenrecord_argv(d["addr"], preset["size"], preset["bitrate"]), preset, ff)
-    except livemod.LiveError as e:
-        raise ApiError(429, str(e))
-    seq, frame = sess.next_frame(0, timeout=10)
-    if frame is None:
-        err = sess.error_text()
+    sess = frame = None
+    err = ""
+    for size in (preset["size"], None):      # preset first, then the TV's native size (some TVs reject odd sizes)
+        try:
+            sess = a.live.open(d["id"], a.adb.screenrecord_argv(d["addr"], size, preset["bitrate"]), preset, ff)
+        except livemod.LiveError as e:
+            raise ApiError(429, str(e))
+        seq, frame = sess.next_frame(0, timeout=8)
+        if frame is not None:
+            break
+        err = sess.error_text() or err
         a.live.release(d["id"], sess)
+    if frame is None:
+        a.events.add(d["name"], "live view failed: %s" % (err or "the TV produced no video"), "error")
         raise ApiError(502, "No video from the TV. " + (err if err else "It may not allow screen capture."))
     a.events.add(d["name"], "live view started (%s)" % name)
     started = time.time()

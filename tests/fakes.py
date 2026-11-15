@@ -33,9 +33,9 @@ class FakeAdb:
 
     def screenrecord_argv(self, addr, size, bitrate):
         self.calls.append(("screenrecord", addr, size))
-        if getattr(self, "live_fail", False):
+        if getattr(self, "live_fail", False) or (size and getattr(self, "live_fail_sized", False)):
             return ["sh", "-c", "echo 'ERROR: no encoder' >&2; exit 1"]
-        return ["ffmpeg", "-nostdin", "-loglevel", "error", "-re", "-f", "lavfi", "-i", "testsrc2=size=%s:rate=15" % size,
+        return ["ffmpeg", "-nostdin", "-loglevel", "error", "-re", "-f", "lavfi", "-i", "testsrc2=size=%s:rate=15" % (size or "320x180"),
                 "-t", "8", "-c:v", "libx264", "-preset", "ultrafast", "-tune", "zerolatency", "-g", "15", "-pix_fmt", "yuv420p", "-f", "h264", "-"]
 
     def reboot(self, addr):

@@ -117,7 +117,26 @@ class LiveApiTests(unittest.TestCase):
         code, msg = self.err("/api/devices/%s/live?quality=low" % self.dev["id"])
         self.assertEqual(code, 502)
         self.assertIn("No video", msg)
+        self.assertIn("no encoder", msg)                              # the TV's own reason reaches the user
         self.assertEqual(self.app.live.count(), 0)                    # nothing left running
+        ev = [e for e in self.app.events.list() if "live view failed" in e["msg"]]
+        self.assertTrue(ev and ev[0]["level"] == "error" and "no encoder" in ev[0]["msg"])   # and the Activity log
+
+    @unittest.skipUnless(FFMPEG, "ffmpeg not installed")
+    def test_retries_with_native_size_when_the_preset_size_is_rejected(self):
+        self.adb.live_fail_sized = True
+        try:
+            resp = self.get("/api/devices/%s/live?quality=low" % self.dev["id"])
+            data = b""
+            end = time.time() + 15
+            while data.count(b"\xff\xd8") < 2 and time.time() < end:
+                data += resp.read1(65536)
+            resp.close()
+        finally:
+            self.adb.live_fail_sized = False
+        self.assertGreaterEqual(data.count(b"\xff\xd8"), 2)
+        sizes = [c[2] for c in self.adb.calls if c[0] == "screenrecord"][-2:]
+        self.assertEqual(sizes, ["854x480", None])                    # preset first, then native
 
     @unittest.skipUnless(FFMPEG, "ffmpeg not installed")
     def test_streams_multipart_frames_and_cleans_up(self):

@@ -55,6 +55,7 @@ class App:
         last = (d.get("restore") or {}).get("last")
         return {
             "id": d["id"], "name": d["name"], "addr": d["addr"], "group": d.get("group", ""),
+            "auto_name": d.get("auto_name", False), "tv_name": st.get("tv_name"),
             "restore": {"enabled": (d.get("restore") or {}).get("enabled", True), "last": last,
                         "last_name": P.short_input_name(last, labels) if last else None},
             "status": st.get("status", "unknown"), "awake": st.get("awake"),
@@ -264,7 +265,7 @@ def r_update_device(h, m, q):
     a = h.app
     d = a.require_device(m.group(1))
     b = h._json_body()
-    fields = {k: b[k] for k in ("name", "addr", "group") if k in b}
+    fields = {k: b[k] for k in ("name", "addr", "group", "auto_name") if k in b}
     if "restore" in b and isinstance(b["restore"], dict):
         r = dict(d.get("restore") or {})
         if "enabled" in b["restore"]:
@@ -275,7 +276,11 @@ def r_update_device(h, m, q):
                 raise ApiError(400, "invalid input id")
             r["last"] = v or None
         fields["restore"] = r
-    h._send(200, a.device_view(a.store.update_device(d["id"], **fields)))
+    updated = a.store.update_device(d["id"], **fields)
+    if fields.get("auto_name"):
+        a.monitor.apply_auto_name(d["id"])          # take the TV's name straight away if we already know it
+        updated = a.store.device(d["id"])
+    h._send(200, a.device_view(updated))
 
 
 @route("DELETE", r"/api/devices/(\w+)")

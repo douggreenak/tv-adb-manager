@@ -104,6 +104,21 @@ class FleetTests(unittest.TestCase):
         self.poll(settle=True)
         self.assertIn("netflix", self.top(A))
 
+    def test_blank_names_follow_each_tvs_own_name(self):
+        lobby = self.store.device(self.ids[A])                    # added with its address as the name -> follows the TV: "Lobby TV"
+        plain = self.store.add_device("", "10.0.0.12")            # factory default: its model name
+        for d in (lobby, plain):
+            self.adb.connect(d["addr"])
+        states = self.adb.devices()
+        for d in (lobby, plain):
+            self.mon.cycle(self.store.device(d["id"]), states[d["addr"]])
+        self.assertEqual(self.store.device(lobby["id"])["name"], "Lobby TV")
+        self.assertEqual(self.store.device(plain["id"])["name"], "SmartTV · .12")
+        self.ctl("set", "10.0.0.11:5555", 'device_name="Front Desk"')      # renamed in the TV's settings
+        self.mon.states.pop(lobby["id"], None)
+        self.mon.cycle(self.store.device(lobby["id"]), "device")
+        self.assertEqual(self.store.device(lobby["id"])["name"], "Front Desk")
+
     def test_package_and_shell_commands(self):
         self.adb.connect(A)
         sh = lambda c: self.adb.shell(A, c)[1]

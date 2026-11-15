@@ -26,7 +26,7 @@ curl -b jar -H 'X-Requested-With: tvm' -H 'Content-Type: application/json' \
 | Method & path | Body / query | Returns |
 |---|---|---|
 | `GET /api/devices` | | `{devices:[…], groups:[…]}`; each device has `id, name, addr, group, status, awake, input, input_name, top, model, manufacturer, android, last_seen, restore:{enabled,last,last_name}` |
-| `POST /api/devices` | `{name, addr, group}` | 201 with the device; `addr` defaults to port 5555 |
+| `POST /api/devices` | `{name?, addr, group}` | 201 with the device; `addr` defaults to port 5555; an empty `name` follows the TV's own name |
 | `PUT /api/devices/<id>` | any of `name, addr, group, restore:{enabled,last}` | updated device |
 | `DELETE /api/devices/<id>` | | |
 | `GET /api/devices/<id>/info` | | props, `storage_kb`, `memory_kb`, `uptime_s`, `ip` |
@@ -36,6 +36,8 @@ curl -b jar -H 'X-Requested-With: tvm' -H 'Content-Type: application/json' \
 | `POST /api/devices/<id>/install?name=app.apk` | raw APK bytes (`application/octet-stream`) | `{ok, output}` |
 | `GET /api/devices/<id>/screenshot` | | `image/png`, or 502 if the TV can't capture |
 | `POST /api/devices/<id>/shell` | `{cmd}` | `{rc, output}` |
+
+Devices also carry `tv_name` (the name the TV reports, or null) and `auto_name` (true while the manager follows it); `PUT` with a different `name` turns `auto_name` off, and `PUT {auto_name: true}` turns it back on.
 
 `status` is one of `online`, `asleep`, `offline`, `unauthorized`, `unknown`.
 

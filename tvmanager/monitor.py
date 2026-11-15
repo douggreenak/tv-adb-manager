@@ -19,7 +19,19 @@ PROBE = ("(dumpsys power | grep -m1 mWakefulness=; echo ==; "
 STATIC_PROBE = ("getprop ro.product.manufacturer; echo ==; getprop ro.product.model; echo ==; "
                 "getprop ro.build.version.release; echo ==; settings get secure tv_input_custom_labels; echo ==; "
                 "cmd package resolve-activity --brief -a android.intent.action.MAIN "
-                "-c android.intent.category.HOME 2>/dev/null | tail -1")
+                "-c android.intent.category.HOME 2>/dev/null | tail -1; echo ==; settings get global device_name")
+
+GENERIC_NAMES = {"android tv", "google tv", "tv", "smart tv", "smarttv", "android", "android box"}
+
+
+def display_name(tv_name, model, addr):
+    """The TV's own name; factory-default names ("Android TV", or just the model) get the address tail so
+    two TVs of the same make are told apart."""
+    t = tv_name.strip()
+    if t.lower() in GENERIC_NAMES or t.lower() == (model or "").strip().lower():
+        return "%s · .%s" % (t, addr.split(":")[0].rsplit(".", 1)[-1])
+    return t
+
 
 WAKE_SETTLE = 3.0       # seconds after waking before we look at what the TV did by itself
 CONNECT_RETRY = 10.0
@@ -132,7 +144,7 @@ class Monitor:
         inp = P.pick_passthrough(sessions)
 
         if not st.get("static_loaded"):
-            self._load_static(st, addr)
+            self._load_static(st, addr, dev)
 
         # Came back after being unreachable (e.g. power loss + cold boot) counts as a wake too.
         reconnected = st["seen_online"] and st["status"] in ("offline", "unauthorized")
@@ -183,14 +195,28 @@ class Monitor:
                         "info" if ok else "error")
         return ok, out
 
-    def _load_static(self, st, addr):
+    def apply_auto_name(self, dev_id):
+        """If this device follows the TV's name, store the name the TV reports."""
+        dev, st = self.store.device(dev_id), self.snapshot(dev_id)
+        if not dev or not st or not dev.get("auto_name") or not st.get("tv_name"):
+            return
+        old = dev["name"]
+        new = self.store.set_auto_name(dev_id, display_name(st["tv_name"], st.get("model"), dev["addr"]))
+        if new:
+            self.events.add(new, "named from the TV (was “%s”)" % old)
+
+    def _load_static(self, st, addr, dev=None):
         rc, out = self.adb.shell(addr, STATIC_PROBE)
         parts = [p.strip() for p in out.split("==")]
         if rc == 0 and len(parts) >= 5:
+            tv = parts[5] if len(parts) > 5 else ""
             st.update(manufacturer=parts[0], model=parts[1], android=parts[2],
                       labels=P.parse_labels(parts[3]),
-                      home=(parts[4].split("/")[0] or None))
+                      home=(parts[4].split("/")[0] or None),
+                      tv_name=(tv if tv and tv != "null" else None))
             st["static_loaded"] = True
+            if dev is not None:
+                self.apply_auto_name(dev["id"])
 
     def _set_status(self, st, name, status, quiet=False):
         if st["status"] != status:

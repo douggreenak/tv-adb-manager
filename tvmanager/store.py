@@ -1,6 +1,7 @@
 """JSON persistence (devices, schedules) and the in-memory + on-disk event log."""
 import json
 import os
+import re
 import threading
 import time
 import uuid
@@ -34,6 +35,7 @@ class Store:
         self.lock = threading.RLock()
         self._devices = self._load("devices.json", [])
         self._schedules = self._load("schedules.json", [])
+        self._migrate_names()
 
     def _load(self, name, default):
         try:
@@ -44,6 +46,17 @@ class Store:
 
     def _save(self, name, data):
         _atomic_write(os.path.join(self.dir, name), data)
+
+    def _migrate_names(self):
+        """Devices named after their address (or the old importer's tv-50-196 style) follow the TV's own name."""
+        changed = False
+        for d in self._devices:
+            if "auto_name" not in d:
+                host = d["addr"].split(":")[0]
+                d["auto_name"] = bool(re.match(r"^tv-\d+-\d+$", d["name"]) or d["name"] in (d["addr"], host))
+                changed = True
+        if changed:
+            self._save("devices.json", self._devices)
 
     # ---- devices -------------------------------------------------------
     def devices(self):
@@ -62,7 +75,10 @@ class Store:
         with self.lock:
             if any(d["addr"] == addr for d in self._devices):
                 raise ValueError("a device with that address already exists")
-            d = {"id": uuid.uuid4().hex[:8], "name": (name or addr).strip()[:60], "addr": addr,
+            host = addr.split(":")[0]
+            name = (name or "").strip()
+            d = {"id": uuid.uuid4().hex[:8], "name": (name or addr)[:60], "addr": addr,
+                 "auto_name": (not name) or name in (addr, host),     # blank: take the TV's own name once it is known
                  "group": (group or "").strip()[:40],
                  "restore": {"enabled": True, "last": None}}
             self._devices.append(d)
@@ -75,11 +91,31 @@ class Store:
                 if d["id"] == dev_id:
                     if "addr" in fields and fields["addr"] is not None:
                         fields["addr"] = normalize_addr(fields["addr"])
+                    if fields.get("name") is not None and fields["name"].strip() and fields["name"].strip() != d["name"]:
+                        d["auto_name"] = False                          # the user chose a name: stop overwriting it
+                    if "auto_name" in fields and fields["auto_name"] is not None:
+                        d["auto_name"] = bool(fields["auto_name"])
                     for k in ("name", "addr", "group", "restore"):
                         if k in fields and fields[k] is not None:
-                            d[k] = fields[k]
+                            d[k] = fields[k].strip() if k == "name" else fields[k]
                     self._save("devices.json", self._devices)
                     return dict(d)
+        return None
+
+    def set_auto_name(self, dev_id, name):
+        """Set the name learned from the TV, keeping names unique. Returns the stored name, or None if unchanged."""
+        name = (name or "").strip()[:60]
+        with self.lock:
+            for d in self._devices:
+                if d["id"] != dev_id or not d.get("auto_name") or not name:
+                    continue
+                if any(o["id"] != dev_id and o["name"] == name for o in self._devices):
+                    name = "%s · .%s" % (name, d["addr"].split(":")[0].rsplit(".", 1)[-1])
+                if d["name"] == name:
+                    return None
+                d["name"] = name
+                self._save("devices.json", self._devices)
+                return name
         return None
 
     def delete_device(self, dev_id):

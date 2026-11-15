@@ -18,9 +18,9 @@ def hdmi_inputs(prefix, n):
     return [{"id": prefix + str(i), "state": "connected" if i == 1 else "standby"} for i in range(1, n + 1)]
 
 
-def new_tv(model, mfr, android, inputs, labels=None, app=HISENSE_APP, state="device"):
+def new_tv(model, mfr, android, inputs, labels=None, app=HISENSE_APP, state="device", name=None):
     return {"reachable": True, "auth": state, "connected": False, "boot_at": time.time() - 3600, "up_at": 0,
-            "awake": True, "session": None, "top": LAUNCHER, "mfr": mfr, "model": model, "android": android,
+            "awake": True, "session": None, "top": LAUNCHER, "mfr": mfr, "model": model, "android": android, "device_name": name,
             "inputs": inputs, "labels": labels or {}, "tvapp": app, "launcher": LAUNCHER,
             "capture": {"screencap": True, "screenrecord": True},
             "packages": {"com.leanbitlab.ltvL": {"disabled": False, "system": False},
@@ -34,7 +34,7 @@ def new_tv(model, mfr, android, inputs, labels=None, app=HISENSE_APP, state="dev
 def seed():
     return {
         "10.0.0.11:5555": new_tv("SmartTV 4K", "Hisense", "11", hdmi_inputs(HS + "HW", 3) + [{"id": "com.hisense.tv.hitvinput/.tuner.TunerTvInputService/HW0", "state": "connected"}],
-                                  {HS + "HW1": "Front Desk", HS + "HW2": "Soundbar"}),
+                                  {HS + "HW1": "Front Desk", HS + "HW2": "Soundbar"}, name="Lobby TV"),
         "10.0.0.12:5555": dict(new_tv("SmartTV", "Hisense", "14", [{"id": "com.mediatek.tvinput/.hdmi.HDMIInputService/HDMI100004", "state": "connected"},
                                                               {"id": "com.mediatek.tvinput/.hdmi.HDMIInputService/HDMI100005", "state": "standby"}]), capture={"screencap": False, "screenrecord": True}),
         "10.0.0.13:5555": dict(new_tv("Smart TV", "TCL", "12", hdmi_inputs("com.tcl.tvinput/.TvPassThroughService/HW", 2) + [{"id": "com.tcl.tvinput/.TunerInputService/HW2", "state": "connected"}],
@@ -137,7 +137,7 @@ def shell(t, cmd):
     if cmd.startswith("(dumpsys power"):
         return 0, probe(t)
     if "getprop ro.product.manufacturer" in cmd and "echo ==" in cmd:
-        return 0, "%s\n==\n%s\n==\n%s\n==\n%s\n==\n%s\n" % (t["mfr"], t["model"], t["android"], labels_value(t), t["launcher"])
+        return 0, "%s\n==\n%s\n==\n%s\n==\n%s\n==\n%s\n==\n%s\n" % (t["mfr"], t["model"], t["android"], labels_value(t), t["launcher"], t.get("device_name") or t["model"])
     if cmd.startswith("dumpsys tv_input"):
         return 0, tv_input_dump(t)
     m = re.match(r"am start -a android.intent.action.VIEW -d '([^']+)'", cmd)

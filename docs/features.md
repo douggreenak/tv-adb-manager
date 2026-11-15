@@ -22,6 +22,14 @@ shapes that morph on press, connected button groups, and avatars whose shape ref
 rose, violet). The whole palette is generated from that seed hue, in both light and dark. The choice is kept in
 the browser, so each person can have their own. Motion respects the OS "reduce motion" setting.
 
+## Device names
+
+Leave the name empty when adding a TV and the manager uses the name set on the TV itself (Android's *device name*, shown in
+the TV's own settings). If the TV still has a factory-default name such as "Android TV" or just its model, the last part of
+its address is added so identical models can be told apart ("Android TV · .196"). If you rename the TV later, the manager
+follows. Type your own name in a device's **Settings** tab and it is kept: the manager never overwrites a name you chose,
+and **Use it** switches back to the TV's name.
+
 ## When a TV is offline
 
 Cards for TVs that are offline or waiting for approval show what to do instead of dead controls, with a

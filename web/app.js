@@ -359,7 +359,7 @@ function modal(title, bodyEls, buttons) {
 }
 
 function addDeviceDialog() {
-  const name = h("input", { type: "text", id: "an", placeholder: "Lobby TV", autocomplete: "off" });
+  const name = h("input", { type: "text", id: "an", placeholder: "Leave empty to use the TV's own name", autocomplete: "off" });
   const addr = h("input", { type: "text", id: "aa", placeholder: "192.168.1.50", autocomplete: "off", inputmode: "decimal" });
   const group = h("input", { type: "text", id: "ag", placeholder: "Optional, e.g. Lobby", list: "grps", autocomplete: "off" });
   const addrErr = h("p", { class: "hint err", role: "alert" });
@@ -370,7 +370,7 @@ function addDeviceDialog() {
   };
   [name, addr, group].forEach(i => i.addEventListener("keydown", e => { if (e.key === "Enter") submit(); }));
   const m = modal("Add device", [
-    h("div", { class: "field" }, h("label", { for: "an" }, "Name"), name),
+    h("div", { class: "field" }, h("label", { for: "an" }, "Name (optional)"), name),
     h("div", { class: "field" }, h("label", { for: "aa" }, "IP address"), addr, h("span", { class: "hint" }, "Port 5555 is used unless you add one, like 192.168.1.50:5556."), addrErr),
     h("div", { class: "field" }, h("label", { for: "ag" }, "Group"), group, h("datalist", { id: "grps" }, S.groups.map(g => h("option", { value: g })))),
     h("p", { class: "muted", style: "font-size:13.5px" }, "ADB debugging (network) must be on in the TV's Developer options. The first connection asks you to approve this server on the TV screen.")], [
@@ -715,11 +715,14 @@ function tabSettings(body, d) {
   const name = h("input", { type: "text", id: "sn", value: d.name }), addr = h("input", { type: "text", id: "sa", value: d.addr }),
     group = h("input", { type: "text", id: "sg", value: d.group, list: "grps2", placeholder: "Optional" });
   body.append(h("div", { class: "panel" }, h("h3", null, "Device"),
-    h("div", { class: "field" }, h("label", { for: "sn" }, "Name"), name),
+    h("div", { class: "field" }, h("label", { for: "sn" }, "Name"), name,
+      d.auto_name ? h("span", { class: "hint" }, d.tv_name ? "Using the name set on the TV. Type a name here to use your own instead." : "Will use the name set on the TV once it connects.")
+        : d.tv_name ? h("span", { class: "hint" }, `Name on the TV: ${d.tv_name} `, h("button", { class: "btn text small", type: "button", onclick: async () => {
+            try { await api("PUT", "/api/devices/" + d.id, { auto_name: true }); await loadDevices(); updateDrawerHead(); renderTab(); toast("Using the TV's name"); } catch (e) { toast(e.message, true); } } }, "Use it")) : null),
     h("div", { class: "field" }, h("label", { for: "sa" }, "Address"), addr),
     h("div", { class: "field" }, h("label", { for: "sg" }, "Group"), group, h("datalist", { id: "grps2" }, S.groups.map(g => h("option", { value: g })))),
     h("div", { class: "keys" },
-      h("button", { class: "btn primary", onclick: async () => { try { await api("PUT", "/api/devices/" + d.id, { name: name.value, addr: addr.value, group: group.value }); await loadDevices(); updateDrawerHead(); toast("Saved"); } catch (e) { toast(e.message, true); } } }, "Save"),
+      h("button", { class: "btn primary", onclick: async () => { try { await api("PUT", "/api/devices/" + d.id, { name: name.value, addr: addr.value, group: group.value }); await loadDevices(); updateDrawerHead(); renderTab(); toast("Saved"); } catch (e) { toast(e.message, true); } } }, "Save"),
       h("button", { class: "btn", onclick: async () => { const r = await act(d.id, "connect"); toast(r.output || (r.ok ? "Connected" : "Failed"), !r.ok); } }, ic("refresh"), "Reconnect ADB"))),
     h("div", { class: "panel" }, h("h3", null, "Remove"), h("p", { class: "muted", style: "margin-bottom:12px" }, "Removes this TV from the manager. Nothing on the TV changes."),
       h("button", { class: "btn danger", onclick: async () => { if (confirm("Remove " + d.name + " from the manager?")) { await api("DELETE", "/api/devices/" + d.id); closeDrawer(); S.selected.delete(d.id); toast("Removed"); refresh(); } } }, "Remove device")));

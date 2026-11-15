@@ -10,6 +10,12 @@ shapes that morph on press, connected button groups, and avatars whose shape ref
 rose, violet). The whole palette is generated from that seed hue, in both light and dark. The choice is kept in
 the browser, so each person can have their own. Motion respects the OS "reduce motion" setting.
 
+## When a TV is offline
+
+Cards for TVs that are offline or waiting for approval show what to do instead of dead controls, with a
+**Reconnect / Try again** button. The drawer's Remote, Inputs, Apps, Install, Shell and Info tabs show the same
+explanation, and refresh themselves the moment the TV comes back. Settings and the power-on options stay usable.
+
 ## Devices
 
 Each card shows the TV's state (**On**, **Standby**, **Offline**, **Needs approval on TV**), model and
@@ -51,7 +57,10 @@ Turn it off per TV on the **Inputs** tab. Events appear in **Activity** ("rememb
 of the week and the target TVs. Times use the **server's** clock. Each schedule can be toggled on and off.
 A schedule fires at most once per minute even if the scheduler wakes twice.
 
+For *Switch input* schedules, pick the input by name from a list loaded from the first selected TV; the raw
+input id is filled in for you and can still be edited.
+
 ## Activity
 
-The last 300 events: status changes, restores, schedule runs, power actions, installs and every shell
-command with the device it ran on. The full log is appended to `data/events.log`.
+The last 300 events as a dated timeline, with icons by type and filters for *All*, *Errors* and each device:
+status changes, restores, schedule runs, power actions, installs and every shell command with the device it ran on. The full log is appended to `data/events.log`.

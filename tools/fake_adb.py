@@ -6,7 +6,7 @@ Control the fleet:         fake_adb.py ctl seed | list | set ADDR key=value ... 
                            | approve ADDR | wake ADDR | standby ADDR | input ADDR <input-id>
 It never talks to a network, so it cannot touch real devices.
 """
-import fcntl, json, os, re, sys, time, urllib.parse
+import fcntl, json, os, re, struct, sys, time, urllib.parse, zlib
 
 STATE = os.environ.get("FAKE_ADB_STATE", "/tmp/fake_adb_fleet.json")
 LAUNCHER = "com.leanbitlab.ltvL/.MainActivity"
@@ -198,6 +198,25 @@ def shell(t, cmd):
     return 127, "/system/bin/sh: %s: inaccessible or not found\n" % cmd.split()[0]
 
 
+def test_card_png(w=640, h=360):
+    """A valid PNG that looks like a TV colour-bar test card, so screenshot UIs have something to show."""
+    bars = [(235, 235, 235), (235, 235, 16), (16, 235, 235), (16, 235, 16), (235, 16, 235), (235, 16, 16), (16, 16, 235)]
+    rows = []
+    for y in range(h):
+        row = bytearray([0])
+        for x in range(w):
+            if y < h * 0.7:
+                r, g, b = bars[x * len(bars) // w]
+            else:
+                v = int(255 * x / w)
+                r = g = b = v
+            row += bytes((r, g, b))
+        rows.append(bytes(row))
+    raw = zlib.compress(b"".join(rows), 6)
+    chunk = lambda t, d: struct.pack(">I", len(d)) + t + d + struct.pack(">I", zlib.crc32(t + d) & 0xffffffff)
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0)) + chunk(b"IDAT", raw) + chunk(b"IEND", b"")
+
+
 def run(argv):
     with Fleet() as F:
         args = list(argv)
@@ -232,7 +251,7 @@ def run(argv):
                 rc, out = shell(t, " ".join(rest))
                 return rc, out, b""
             if op == "exec-out" and rest[:1] == ["screencap"]:
-                return 0, b"\x89PNG\r\n\x1a\n" + b"\x00" * 64, b""
+                return 0, test_card_png(), b""
             if op == "install":
                 return 0, "Performing Streamed Install\nSuccess\n", b""
             if op == "reboot":

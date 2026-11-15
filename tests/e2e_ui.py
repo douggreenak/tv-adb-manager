@@ -1,7 +1,7 @@
 """Browser end-to-end test of the whole UI against a simulated fleet (needs `pip install playwright`
 and a Chromium; run `python tests/e2e_ui.py` from the repo root). It starts its own manager on
 127.0.0.1:8431 with a throwaway data dir and tools/fake_adb.py, so it never touches real TVs."""
-import atexit, os, subprocess, sys, tempfile, time
+import atexit, os, re, subprocess, sys, tempfile, time
 from playwright.sync_api import sync_playwright, expect
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FAKE = os.path.join(ROOT, "tools", "fake_adb.py")
@@ -21,13 +21,13 @@ with sync_playwright() as p:
     pg.set_default_timeout(10000)
     pg.on("pageerror", lambda e: errs.append("pageerror: %s" % e))
     pg.on("console", lambda m: errs.append("console.%s: %s" % (m.type, m.text)) if m.type in ("error", "warning") else None)
-    pg.goto("http://127.0.0.1:8431/")
+    pg.goto("http://127.0.0.1:8431/?nosso")  # nosso: skip the Services Hub redirect (web/sso.js)
     pg.wait_for_selector("#pw"); pg.screenshot(path=OUT + "/f_login.png")
     pg.fill("#pw", "wrong"); pg.press("#pw", "Enter"); pg.wait_for_selector(".err:has-text('wrong password')")
-    pg.fill("#pw", "testpass123"); pg.press("#pw", "Enter"); pg.wait_for_selector("#fab")
+    pg.fill("#pw", "testpass123"); pg.press("#pw", "Enter"); pg.wait_for_selector("text=Add your first TV")
     # add the five fake TVs through the dialog
     for name, addr, grp in [("Lobby", "10.0.0.11", "Lobby"), ("Gym", "10.0.0.12", "Fitness"), ("Cafe", "10.0.0.13", "Lobby"), ("Office", "10.0.0.14", "Offices"), ("Spare", "10.0.0.15", "")]:
-        pg.click("#fab"); pg.fill("#an", name); pg.fill("#aa", addr); pg.fill("#ag", grp)
+        pg.get_by_role("button", name=re.compile(r"^Add (device|your first TV)$")).click(); pg.fill("#an", name); pg.fill("#aa", addr); pg.fill("#ag", grp)
         pg.click(".modal button:text-is('Add')"); pg.wait_for_selector(".card[aria-label='Open %s']" % name)
     # duplicate rejected
     pg.click("#fab"); pg.fill("#an", "dup"); pg.fill("#aa", "10.0.0.11"); pg.click(".modal button:text-is('Add')")
@@ -46,7 +46,7 @@ with sync_playwright() as p:
     pg.locator(".card[aria-label='Open Lobby']").click(); pg.wait_for_selector(".drawer")
     pg.click("role=tab[name='Inputs']"); pg.wait_for_selector("text=Soundbar")
     pg.locator(".row:has-text('Soundbar') >> text=Switch").click(); pg.wait_for_timeout(2500)
-    expect(pg.locator(".row:has-text('Soundbar') .badge")).to_have_text("active")
+    expect(pg.locator(".row:has-text('Soundbar') .badge.active")).to_have_text("Active")
     pg.screenshot(path=OUT + "/f_inputs.png")
     assert "HW2" in ctl("list")
     # keyboard remote
@@ -55,7 +55,7 @@ with sync_playwright() as p:
     # apps: disable netflix then re-enable
     pg.click("role=tab[name='Apps']"); pg.wait_for_selector(".row:has-text('com.netflix.ninja')")
     pg.locator(".row:has-text('com.netflix.ninja') >> text=Disable").click(); pg.wait_for_timeout(1500)
-    pg.select_option("select[aria-label='Package filter']", "disabled"); pg.wait_for_selector(".row:has-text('com.netflix.ninja') .badge")
+    pg.select_option("select[aria-label='Package filter']", "disabled"); pg.wait_for_selector(".row:has-text('com.netflix.ninja') .chip-s")
     pg.screenshot(path=OUT + "/f_apps.png")
     pg.locator(".row:has-text('com.netflix.ninja') >> text=Enable").click(); pg.wait_for_timeout(1500)
     # install an APK
@@ -75,10 +75,10 @@ with sync_playwright() as p:
     pg.screenshot(path=OUT + "/f_bulk.png")
     # schedule
     pg.click("nav >> text=Schedules"); pg.click("#fab"); pg.fill("#sn1", "Morning on"); pg.fill("#st1", "07:30")
-    pg.click(".modal .chip:has-text('Lobby')"); pg.click(".modal >> text=Save"); pg.wait_for_selector(".row:has-text('Morning on')")
+    pg.click(".modal .chip:has-text('Lobby')"); pg.click(".modal >> text=Save"); pg.wait_for_selector(".sched:has-text('Morning on')")
     pg.screenshot(path=OUT + "/f_sched.png")
     # activity log
-    pg.click("nav >> text=Activity"); pg.wait_for_selector("td:has-text('restored input')"); pg.screenshot(path=OUT + "/f_activity.png")
+    pg.click("nav >> text=Activity"); pg.wait_for_selector(".ev:has-text('restored input')"); pg.screenshot(path=OUT + "/f_activity.png")
     # change password + relogin
     pg.click("nav >> text=Settings"); pg.fill("#pc", "testpass123"); pg.fill("#pn", "newpass4567"); pg.click("text=Update"); pg.wait_for_selector("text=Password changed")
     # appearance: dark theme + teal accent, then back to the devices page

@@ -31,6 +31,9 @@ python3 tools/fake_adb.py ctl set 10.0.0.11:5555 'top="com.netflix.ninja/.MainAc
 TVM_ADB=$PWD/tools/fake_adb.py TVM_DATA=/tmp/tvm-demo TVM_PORT=8431 TVM_POLL=1 python3 -m tvmanager
 ```
 
+`web/sso.js` redirects signed-out visitors to the Services Hub. Add `?nosso` to the URL to see the manager's own
+login page (the browser tests do this).
+
 To support a new command, add a branch in `shell()`; to model a new TV, add an entry in `seed()`.
 
 ## Adding support for a new TV brand

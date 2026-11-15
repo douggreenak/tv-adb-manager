@@ -26,6 +26,56 @@ function toast(msg, error = false) {
   setTimeout(() => t.remove(), error ? 6000 : 2600);
 }
 
+
+/* ---------- Material icons (Apache-2.0 path data), built with createElementNS ---------- */
+const ICONS = {
+  tv: "M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z",
+  schedule: "M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z",
+  list: "M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z",
+  settings: "M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z",
+  add: "M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z",
+  remove: "M19 13H5v-2h14v2z",
+  search: "M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z",
+  close: "M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z",
+  apps: "M4 8h4V4H4v4zm6 12h4v-4h-4v4zm-6 0h4v-4H4v4zm0-6h4v-4H4v4zm6 0h4v-4h-4v4zm6-10v4h4V4h-4zm-6 4h4V4h-4v4zm6 6h4v-4h-4v4zm0 6h4v-4h-4v4z",
+  logout: "M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z",
+  back: "M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z",
+  home: "M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z",
+  menu: "M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z",
+  info: "M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z",
+  input: "M21 3.01H3c-1.1 0-2 .9-2 2V9h2V4.99h18v14.03H3V15H1v4.01c0 1.1.9 1.98 2 1.98h18c1.1 0 2-.88 2-1.98v-14c0-1.11-.9-2-2-2zM11 16l4-4-4-4v3H1v2h10v3z",
+  up: "M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z",
+  down: "M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z",
+  left: "M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6z",
+  right: "M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z",
+  volume_off: "M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z",
+  rewind: "M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z",
+  play: "M8 5v14l11-7z",
+  ff: "M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z",
+  power: "M13 3h-2v10h2V3zm4.83 2.17l-1.42 1.42C17.99 7.86 19 9.81 19 12c0 3.87-3.13 7-7 7s-7-3.13-7-7c0-2.19 1.01-4.14 2.58-5.42L6.17 5.17C4.23 6.82 3 9.26 3 12c0 4.97 4.03 9 9 9s9-4.03 9-9c0-2.74-1.23-5.18-3.17-6.83z",
+  check: "M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z",
+};
+function ic(name) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24"); svg.setAttribute("class", "ic"); svg.setAttribute("aria-hidden", "true");
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("d", ICONS[name]); svg.append(path);
+  return svg;
+}
+
+/* ---------- theme: light/dark/auto + accent seed hue, remembered per browser ---------- */
+const prefs = {
+  get(k, d) { try { return localStorage.getItem(k) ?? d; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* private mode */ } },
+};
+const HUES = [["Blue", 262], ["Teal", 195], ["Green", 150], ["Amber", 75], ["Rose", 5], ["Violet", 300]];
+function applyTheme() {
+  const r = document.documentElement, mode = prefs.get("tvm-mode", "auto");
+  if (mode === "auto") delete r.dataset.theme; else r.dataset.theme = mode;
+  r.style.setProperty("--h", String(parseInt(prefs.get("tvm-hue", "262"), 10) || 262));
+}
+applyTheme();
+
 async function api(method, path, body) {
   const opt = { method, credentials: "same-origin", headers: { "X-Requested-With": "tvm" } };
   if (body !== undefined) { opt.headers["Content-Type"] = "application/json"; opt.body = JSON.stringify(body); }
@@ -62,10 +112,11 @@ function showLogin(msg) {
     try { await api("POST", "/api/login", { password: pw.value }); start(); }
     catch (x) { err.textContent = x.message; pw.select(); }
   };
-  $("#app").replaceChildren(h("form", { class: "login", onsubmit: go },
-    h("h2", { style: "margin-bottom:14px" }, "TV Manager"),
+  $("#app").replaceChildren(h("div", { class: "login-screen" }, h("form", { class: "login", onsubmit: go },
+    h("div", { class: "brand-mark" }, ic("tv")), h("h1", null, "TV Manager"),
+    h("p", { class: "muted", style: "margin-bottom:22px" }, "Sign in to manage your TVs"),
     h("div", { class: "field" }, h("label", { for: "pw" }, "Password"), pw),
-    err, h("button", { class: "btn primary", style: "width:100%;margin-top:8px", type: "submit" }, "Sign in")));
+    err, h("button", { class: "btn primary", type: "submit" }, "Sign in"))));
   pw.focus();
 }
 
@@ -80,17 +131,30 @@ async function start() {
   S.timer = setInterval(() => { if (!document.hidden) tick(); }, 3000);
 }
 
+const NAV = [["devices", "Devices", "tv"], ["schedules", "Schedules", "schedule"], ["events", "Activity", "list"], ["settings", "Settings", "settings"]];
+const hubUrl = () => `http://${location.hostname}:8090/apps`;
+const signOut = async () => { await api("POST", "/api/logout"); showLogin(); };
+
 function renderShell() {
-  const nav = ["devices", "schedules", "events", "settings"].map(v =>
-    h("button", { "aria-current": String(S.view === v), onclick: () => { S.view = v; renderShell(); refresh(); } },
-      { devices: "Devices", schedules: "Schedules", events: "Activity", settings: "Settings" }[v]));
-  $("#app").replaceChildren(
-    h("header", { class: "topbar" },
-      h("div", { class: "brand" }, "TV Manager"), h("nav", { class: "nav" }, nav),
-      h("a", { class: "btn small appslink", href: `http://${location.hostname}:8090/apps`, title: "Services hub \u2014 all apps" },
-        Object.assign(document.createElement("span"), { innerHTML: '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 4h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4zM4 10h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4zM4 16h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4z"/></svg>' }), "Apps"),
-      h("button", { class: "btn small", onclick: async () => { await api("POST", "/api/logout"); showLogin(); } }, "Sign out")),
-    h("main", { class: "main", id: "main" }));
+  const items = NAV.map(([v, label, icon]) => h("button", { class: "nav-item", "aria-current": String(S.view === v),
+    onclick: () => { S.view = v; renderShell(); refresh(); } }, h("span", { class: "pill" }, ic(icon)), label));
+  const hubExtra = h("a", { class: "nav-item nav-extra appslink", href: hubUrl(), title: "Services hub \u2014 all apps" }, h("span", { class: "pill" }, ic("apps")), "Apps");
+  const outExtra = h("button", { class: "nav-item nav-extra", onclick: signOut }, h("span", { class: "pill" }, ic("logout")), "Sign out");
+  $("#app").replaceChildren(h("div", { class: "shell" },
+    h("header", { class: "topbar" }, h("div", { class: "title" }, "TV Manager"),
+      h("a", { class: "icon-btn appslink", href: hubUrl(), title: "Services hub \u2014 all apps", "aria-label": "Apps" }, ic("apps")),
+      h("button", { class: "icon-btn", onclick: signOut, "aria-label": "Sign out" }, ic("logout"))),
+    h("nav", { class: "nav", "aria-label": "Main" }, h("div", { class: "brand-mark", title: "TV Manager" }, ic("tv")), items,
+      h("div", { class: "nav-spacer" }), hubExtra, outExtra),
+    h("div", { class: "content" }, h("main", { class: "main", id: "main" }))));
+  renderFab();
+}
+
+/* one contextual extended FAB per page */
+function renderFab() {
+  $("#fab")?.remove();
+  const spec = { devices: ["Add device", addDeviceDialog], schedules: ["New schedule", () => scheduleDialog()] }[S.view];
+  if (spec) $(".shell").append(h("button", { class: "fab", id: "fab", onclick: spec[1] }, ic("add"), spec[0]));
 }
 
 async function tick() {
@@ -129,8 +193,9 @@ function renderDevices() {
 
   // keep search box focus across live re-renders
   const prev = $("#search"); const keepFocus = prev && document.activeElement === prev; const caret = prev && prev.selectionStart;
-  const search = h("input", { type: "text", id: "search", placeholder: "Search devices", value: S.filter, "aria-label": "Search devices",
-    style: "max-width:240px", oninput: e => { S.filter = e.target.value; renderDevices(); } });
+  const search = h("label", { class: "searchbar" }, ic("search"),
+    h("input", { type: "text", id: "search", placeholder: "Search devices", value: S.filter, "aria-label": "Search devices",
+      oninput: e => { S.filter = e.target.value; renderDevices(); } }));
 
   const groupChips = S.groups.length ? h("div", { class: "chips", role: "group", "aria-label": "Filter by group" },
     h("button", { class: "chip", "aria-pressed": String(!S.group), onclick: () => { S.group = ""; renderDevices(); } }, "All"),
@@ -142,17 +207,18 @@ function renderDevices() {
     ...[["wake", "Wake"], ["sleep", "Standby"], ["home", "Home"], ["restore", "Restore input"]].map(([a, l]) =>
       h("button", { class: "btn small", onclick: () => bulk_(a, sel) }, l)),
     h("button", { class: "btn small danger", onclick: () => confirm("Reboot " + sel.length + " device(s)?") && bulk_("reboot", sel) }, "Reboot"),
-    h("span", { class: "grow", style: "flex:1" }),
+    h("span", { style: "flex:1" }),
     h("button", { class: "btn small", onclick: () => { S.selected.clear(); renderDevices(); } }, "Clear")) : null;
 
   const cards = list.length ? h("div", { class: "grid" }, list.map(card)) :
-    h("div", { class: "empty" }, S.devices.length ? "No devices match." : "No devices yet. Add a TV by its IP address to get started.");
+    h("div", { class: "empty" }, S.devices.length ? "No devices match." : "No devices yet. Tap Add device and enter a TV's IP address to get started.");
+  const stat = (cls, text) => h("span", { class: "stat " + cls }, h("i"), text);
 
   main.replaceChildren(
+    h("div", { class: "page-head" }, h("h1", null, "Devices"),
+      h("div", { class: "stats" }, stat("on", online + " on"), stat("sb", asleep + " standby"), stat("", off + " offline"))),
     h("div", { class: "toolbar" }, search, groupChips, h("span", { class: "grow" }),
-      h("div", { class: "summary" }, h("span", null, online + " on"), h("span", null, asleep + " standby"), h("span", null, off + " offline")),
-      h("button", { class: "btn", onclick: () => { const all = list.every(d => S.selected.has(d.id)); list.forEach(d => all ? S.selected.delete(d.id) : S.selected.add(d.id)); renderDevices(); } }, "Select all"),
-      h("button", { class: "btn primary", onclick: addDeviceDialog }, "+ Add device")),
+      h("button", { class: "btn", onclick: () => { const all = list.every(d => S.selected.has(d.id)); list.forEach(d => all ? S.selected.delete(d.id) : S.selected.add(d.id)); renderDevices(); } }, "Select all")),
     ...(bulk ? [bulk] : []), cards);
   if (keepFocus) { const s = $("#search"); s.focus(); s.setSelectionRange(caret, caret); }
 }
@@ -172,18 +238,18 @@ function card(d) {
   return h("div", { class: "card" + (sel ? " selected" : ""), tabindex: "0", role: "button", "aria-label": "Open " + d.name,
       onclick: open, onkeydown: e => { if (e.key === "Enter" && e.target === e.currentTarget) open(); } },
     h("div", { class: "card-head" },
+      h("div", { class: "avatar av-" + d.status }, ic("tv")),
+      h("div", { class: "title" }, h("div", { class: "name" }, d.name), h("div", { class: "mono" }, d.addr)),
       h("input", { type: "checkbox", checked: sel, "aria-label": "Select " + d.name,
-        onclick: e => e.stopPropagation(), onchange: e => { e.target.checked ? S.selected.add(d.id) : S.selected.delete(d.id); renderDevices(); } }),
-      h("div", { class: "title" }, h("div", { class: "name" }, d.name), h("div", { class: "muted mono" }, d.addr)),
-      statusEl(d)),
+        onclick: e => e.stopPropagation(), onchange: e => { e.target.checked ? S.selected.add(d.id) : S.selected.delete(d.id); renderDevices(); } })),
+    h("div", { class: "card-meta" }, statusEl(d), d.group ? h("span", { class: "badge" }, d.group) : null),
     h("dl", null,
       h("dt", null, "Model"), h("dd", null, [d.manufacturer, d.model].filter(Boolean).join(" ") || "–", d.android ? ` · Android ${d.android}` : ""),
       h("dt", null, "Input"), h("dd", null, d.input_name || (d.status === "online" ? "App / launcher" : "–")),
       h("dt", null, "Showing"), h("dd", { title: d.top || "" }, shortApp(d.top)),
       h("dt", null, "Last input"), h("dd", null, d.restore.last_name ? d.restore.last_name + (d.restore.enabled ? "" : " (restore off)") : "not yet recorded"),
       h("dt", null, "Seen"), h("dd", null, ago(d.last_seen))),
-    h("div", { class: "card-actions" }, quick("Wake", "wake"), quick("Standby", "sleep"), quick("Home", "home"),
-      d.group ? h("span", { class: "badge", style: "margin-left:auto;align-self:center" }, d.group) : null));
+    h("div", { class: "btn-group full" }, quick("Wake", "wake"), quick("Standby", "sleep"), quick("Home", "home")));
 }
 
 function modal(title, bodyEls, buttons) {
@@ -208,7 +274,7 @@ function addDeviceDialog() {
     h("div", { class: "field" }, h("label", { for: "ag" }, "Group"), group, h("datalist", { id: "grps" }, S.groups.map(g => h("option", { value: g })))),
     h("p", { class: "muted" }, "Developer options → ADB debugging (network) must be on. The first connection asks you to approve this server on the TV screen."),
     err], [
-    h("button", { class: "btn", onclick: () => m.close() }, "Cancel"),
+    h("button", { class: "btn text", onclick: () => m.close() }, "Cancel"),
     h("button", { class: "btn primary", onclick: async () => {
       try { await api("POST", "/api/devices", { name: name.value, addr: addr.value, group: group.value }); m.close(); toast("Device added"); refresh(); }
       catch (e) { err.textContent = e.message; } } }, "Add")]);
@@ -242,7 +308,7 @@ function drawerKeys(e) { if (e.key === "Escape" && !$(".modal")) closeDrawer(); 
 function updateDrawerHead() {
   const d = byId(S.open), head = $("#dhead"); if (!d || !head) return;
   head.replaceChildren(h("div", { class: "grow" }, h("h2", null, d.name), h("div", { class: "muted mono" }, d.addr + (d.group ? " · " + d.group : ""))),
-    statusEl(d), h("button", { class: "btn small", onclick: closeDrawer, "aria-label": "Close" }, "✕"));
+    statusEl(d), h("button", { class: "icon-btn", onclick: closeDrawer, "aria-label": "Close" }, ic("close")));
 }
 function renderTabs() {
   $("#dtabs").replaceChildren(...TABS.map(([k, l]) => h("button", { role: "tab", "aria-selected": String(S.tab === k),
@@ -259,7 +325,8 @@ async function sendKey(id, key) {
 }
 
 function tabRemote(body, d) {
-  const k = (label, key, extra) => h("button", { class: "btn", title: key.replace("KEYCODE_", ""), "aria-label": extra || label, onclick: () => sendKey(d.id, key) }, label);
+  const k = (kids, key, label, cls) => h("button", { class: "btn" + (cls ? " " + cls : ""), title: key.replace("KEYCODE_", ""), "aria-label": label,
+    onclick: () => sendKey(d.id, key) }, kids);
   const blank = () => h("span");
   const img = h("img", { class: "shot hidden", alt: "Screenshot of " + d.name });
   const load = async (quiet) => {
@@ -268,28 +335,38 @@ function tabRemote(body, d) {
       if (!r.ok) throw new Error((await r.json()).error); img.src = URL.createObjectURL(await r.blob()); img.classList.remove("hidden");
     } catch (e) { if (!quiet) toast(e.message, true); }
   };
-  const kb = h("input", { type: "checkbox", id: "kbctl" });
+  const kb = h("input", { type: "checkbox", class: "switch", role: "switch", id: "kbctl", "aria-label": "Use keyboard" });
   const keymap = { ArrowUp: "KEYCODE_DPAD_UP", ArrowDown: "KEYCODE_DPAD_DOWN", ArrowLeft: "KEYCODE_DPAD_LEFT", ArrowRight: "KEYCODE_DPAD_RIGHT", Enter: "KEYCODE_DPAD_CENTER", Backspace: "KEYCODE_BACK", h: "KEYCODE_HOME" };
   const onKey = e => { if (!kb.checked || !$("#drawer") || ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName) && document.activeElement !== kb) return;
     if (keymap[e.key]) { e.preventDefault(); e.stopPropagation(); sendKey(d.id, keymap[e.key]); } };
   document.addEventListener("keydown", onKey, true);
   cleanups.push(() => document.removeEventListener("keydown", onKey, true));
   if (d.status === "online") load(true);
+  const power = (label, action, msg, cls) => h("button", { class: "btn small" + (cls ? " " + cls : ""), onclick: async () => {
+    if (action === "reboot" && !confirm("Reboot " + d.name + "?")) return;
+    const r = await act(d.id, action); toast(r.ok ? msg : r.output, !r.ok); } }, ic("power"), label);
 
   body.append(h("div", { class: "panel" }, h("div", { class: "remote" },
-    h("div", null,
-      h("div", { class: "pad" }, blank(), k("▲", "KEYCODE_DPAD_UP", "Up"), blank(), k("◀", "KEYCODE_DPAD_LEFT", "Left"), k("OK", "KEYCODE_DPAD_CENTER"), k("▶", "KEYCODE_DPAD_RIGHT", "Right"), blank(), k("▼", "KEYCODE_DPAD_DOWN", "Down"), blank()),
-      h("div", { class: "keys" }, k("Back", "KEYCODE_BACK"), k("Home", "KEYCODE_HOME"), k("Menu", "KEYCODE_MENU"), k("Info", "KEYCODE_INFO"), k("Input", "KEYCODE_TV_INPUT")),
-      h("div", { class: "keys" }, k("Vol −", "KEYCODE_VOLUME_DOWN"), k("Vol +", "KEYCODE_VOLUME_UP"), k("Mute", "KEYCODE_VOLUME_MUTE")),
-      h("div", { class: "keys" }, k("Rew", "KEYCODE_MEDIA_REWIND", "Rewind"), k("Play/Pause", "KEYCODE_MEDIA_PLAY_PAUSE"), k("FF", "KEYCODE_MEDIA_FAST_FORWARD", "Fast forward")),
-      h("div", { class: "keys" },
-        h("button", { class: "btn", onclick: async () => { const r = await act(d.id, "wake"); toast(r.ok ? "Wake sent" : r.output, !r.ok); } }, "Wake"),
-        h("button", { class: "btn", onclick: async () => { const r = await act(d.id, "sleep"); toast(r.ok ? "Standby sent" : r.output, !r.ok); } }, "Standby"),
-        h("button", { class: "btn danger", onclick: async () => { if (confirm("Reboot " + d.name + "?")) { const r = await act(d.id, "reboot"); toast(r.ok ? "Rebooting…" : r.output, !r.ok); } } }, "Reboot")),
-      h("div", { class: "field", style: "margin-top:12px" }, h("label", { for: "kbctl" }, h("span", null, kb, " Use keyboard (arrows, Enter, Backspace = Back, H = Home)")))),
+    h("div", { class: "remote-left" },
+      h("div", { class: "pad-row" },
+        h("div", { class: "pad", role: "group", "aria-label": "Directional pad" },
+          blank(), k(ic("up"), "KEYCODE_DPAD_UP", "Up"), blank(),
+          k(ic("left"), "KEYCODE_DPAD_LEFT", "Left"), k("OK", "KEYCODE_DPAD_CENTER", "OK", "ok"), k(ic("right"), "KEYCODE_DPAD_RIGHT", "Right"),
+          blank(), k(ic("down"), "KEYCODE_DPAD_DOWN", "Down"), blank()),
+        h("div", { class: "vol", role: "group", "aria-label": "Volume" },
+          k(ic("add"), "KEYCODE_VOLUME_UP", "Volume up"), k(ic("volume_off"), "KEYCODE_VOLUME_MUTE", "Mute"), k(ic("remove"), "KEYCODE_VOLUME_DOWN", "Volume down"))),
+      h("div", { class: "btn-group" },
+        k([ic("back"), "Back"], "KEYCODE_BACK", "Back", "small"), k([ic("home"), "Home"], "KEYCODE_HOME", "Home", "small"), k([ic("menu"), "Menu"], "KEYCODE_MENU", "Menu", "small")),
+      h("div", { class: "btn-group" },
+        k([ic("info"), "Info"], "KEYCODE_INFO", "Info", "small"), k([ic("input"), "Input"], "KEYCODE_TV_INPUT", "Input", "small")),
+      h("div", { class: "btn-group" },
+        k(ic("rewind"), "KEYCODE_MEDIA_REWIND", "Rewind", "small"), k(ic("play"), "KEYCODE_MEDIA_PLAY_PAUSE", "Play/Pause", "small"), k(ic("ff"), "KEYCODE_MEDIA_FAST_FORWARD", "Fast forward", "small")),
+      h("div", { class: "keys" }, power("Wake", "wake", "Wake sent"), power("Standby", "sleep", "Standby sent"), power("Reboot", "reboot", "Rebooting…", "danger")),
+      h("label", { class: "row", for: "kbctl", style: "width:100%" }, h("span", { class: "grow" }, "Use keyboard",
+        h("span", { class: "sub", style: "display:block" }, "Arrows, Enter, Backspace = Back, H = Home")), kb)),
     h("div", null, img,
-      h("div", { class: "keys" }, h("button", { class: "btn small", onclick: () => load() }, "Screenshot"),
-        h("label", { class: "muted" }, h("input", { type: "checkbox", onchange: e => { clearInterval(shotTimer); if (e.target.checked) { load(true); shotTimer = setInterval(() => load(true), 3000); } } }), " Auto-refresh"))))));
+      h("div", { class: "keys", style: "margin-top:12px" }, h("button", { class: "btn small", onclick: () => load() }, "Screenshot"),
+        h("label", { class: "keys muted" }, h("input", { type: "checkbox", class: "switch", role: "switch", "aria-label": "Auto-refresh", onchange: e => { clearInterval(shotTimer); if (e.target.checked) { load(true); shotTimer = setInterval(() => load(true), 3000); } } }), "Auto-refresh"))))));
 }
 
 async function tabInputs(body, d) {
@@ -298,8 +375,8 @@ async function tabInputs(body, d) {
   body.append(box, restore);
   const drawRestore = dev => restore.replaceChildren(h("h3", null, "Power-on behaviour"),
     h("p", { class: "muted" }, "When this TV wakes or boots to the launcher, return it to the last HDMI input it was using."),
-    h("div", { class: "row" }, h("label", { class: "grow" }, h("input", { type: "checkbox", checked: dev.restore.enabled,
-      onchange: async e => { try { await api("PUT", "/api/devices/" + d.id, { restore: { enabled: e.target.checked } }); await loadDevices(); toast("Saved"); } catch (x) { toast(x.message, true); } } }), " Restore last input on power-on")),
+    h("label", { class: "row" }, h("span", { class: "grow" }, "Restore last input on power-on"), h("input", { type: "checkbox", class: "switch", role: "switch", checked: dev.restore.enabled, "aria-label": "Restore last input on power-on",
+      onchange: async e => { try { await api("PUT", "/api/devices/" + d.id, { restore: { enabled: e.target.checked } }); await loadDevices(); toast("Saved"); } catch (x) { toast(x.message, true); } } })),
     h("div", { class: "row" }, h("div", { class: "grow" }, "Remembered input", h("div", { class: "sub" }, dev.restore.last || "none yet")),
       h("button", { class: "btn small", onclick: async () => { const r = await act(d.id, "restore"); toast(r.ok ? "Restored" : r.output, !r.ok); if (r.ok) settle(); } }, "Restore now"),
       h("button", { class: "btn small", onclick: async () => { await api("PUT", "/api/devices/" + d.id, { restore: { last: null } }); await loadDevices(); drawRestore(byId(d.id)); } }, "Forget")));
@@ -422,15 +499,14 @@ async function renderSchedules() {
   const { schedules } = await api("GET", "/api/schedules");
   const name = id => (byId(id) || { name: "(removed)" }).name;
   const desc = s => ({ wake: "Wake", sleep: "Standby", reboot: "Reboot", home: "Go Home", input: "Switch input" }[s.action]) + (s.input ? " → " + s.input.split("/").pop() : "");
-  main.replaceChildren(h("div", { class: "toolbar" }, h("h2", { style: "flex:1" }, "Schedules"),
-    h("button", { class: "btn primary", onclick: () => scheduleDialog() }, "+ New schedule")),
-    h("p", { class: "muted" }, "Times use the server's clock. Standby and wake use the same keys as the remote."),
+  main.replaceChildren(h("div", { class: "page-head" }, h("h1", null, "Schedules"),
+      h("p", { class: "sub" }, "Run power and input actions at set times. Times use the server's clock.")),
     schedules.length ? h("div", { class: "panel" }, h("div", { class: "list" }, schedules.map(s => h("div", { class: "row" },
-      h("input", { type: "checkbox", checked: s.enabled, "aria-label": "Enabled", onchange: async e => { await api("PUT", "/api/schedules/" + s.id, { ...s, enabled: e.target.checked }); } }),
+      h("input", { type: "checkbox", class: "switch", role: "switch", checked: s.enabled, "aria-label": "Enabled", onchange: async e => { await api("PUT", "/api/schedules/" + s.id, { ...s, enabled: e.target.checked }); } }),
       h("div", { class: "grow" }, h("strong", null, s.name), h("div", { class: "sub" }, `${s.time} · ${s.days.length === 7 ? "every day" : s.days.map(d => DAYS[d]).join(", ")} · ${desc(s)} · ${s.targets.map(name).join(", ")}`)),
       h("button", { class: "btn small", onclick: () => scheduleDialog(s) }, "Edit"),
       h("button", { class: "btn small danger", onclick: async () => { if (confirm("Delete schedule " + s.name + "?")) { await api("DELETE", "/api/schedules/" + s.id); renderSchedules(); } } }, "Delete"))))) :
-      h("div", { class: "empty" }, "No schedules yet."));
+      h("div", { class: "empty" }, "No schedules yet. Tap New schedule to add one."));
 }
 
 function scheduleDialog(s) {
@@ -453,7 +529,7 @@ function scheduleDialog(s) {
     h("div", { class: "field" }, h("label", { for: "st1" }, "Time"), time),
     h("div", { class: "field" }, h("label", null, "Days"), dayChips),
     h("div", { class: "field" }, h("label", null, "Devices"), devChips), err], [
-    h("button", { class: "btn", onclick: () => m.close() }, "Cancel"),
+    h("button", { class: "btn text", onclick: () => m.close() }, "Cancel"),
     h("button", { class: "btn primary", onclick: async () => {
       const body = { name: name.value, action: action.value, time: time.value, days: [...days], targets: [...targets], input: inp.value || null, enabled: s.enabled };
       try { await api(s.id ? "PUT" : "POST", "/api/schedules" + (s.id ? "/" + s.id : ""), body); m.close(); renderSchedules(); } catch (e) { err.textContent = e.message; } } }, "Save")]);
@@ -463,7 +539,7 @@ function scheduleDialog(s) {
 async function renderEvents() {
   const main = $("#main"); if (!main || S.view !== "events") return;
   const { events } = await api("GET", "/api/events");
-  main.replaceChildren(h("div", { class: "toolbar" }, h("h2", null, "Activity")),
+  main.replaceChildren(h("div", { class: "page-head" }, h("h1", null, "Activity"), h("p", { class: "sub" }, "Status changes, restores, schedule runs and every action taken here.")),
     h("div", { class: "panel" }, events.length ? h("table", null,
       h("thead", null, h("tr", null, h("th", null, "Time"), h("th", null, "Device"), h("th", null, "Event"))),
       h("tbody", null, events.map(e => h("tr", { class: e.level === "error" ? "ev-error" : "" },
@@ -475,12 +551,22 @@ function renderSettings() {
   const main = $("#main"); if (!main) return;
   const cur = h("input", { type: "password", id: "pc", autocomplete: "current-password" }), nw = h("input", { type: "password", id: "pn", autocomplete: "new-password" });
   const msg = h("p", { class: "err", role: "alert" });
-  main.replaceChildren(h("div", { class: "toolbar" }, h("h2", null, "Settings")),
-    h("div", { class: "panel", style: "max-width:420px" }, h("h3", null, "Change password"),
+  const mode = prefs.get("tvm-mode", "auto"), hue = parseInt(prefs.get("tvm-hue", "262"), 10);
+  const setMode = m => { prefs.set("tvm-mode", m); applyTheme(); renderSettings(); };
+  const setHue = v => { prefs.set("tvm-hue", String(v)); applyTheme(); renderSettings(); };
+  main.replaceChildren(h("div", { class: "page-head" }, h("h1", null, "Settings")),
+    h("div", { class: "panel", style: "max-width:560px" }, h("h3", null, "Appearance"),
+      h("div", { class: "field" }, h("label", null, "Theme"),
+        h("div", { class: "btn-group", role: "group", "aria-label": "Theme" }, [["auto", "Auto"], ["light", "Light"], ["dark", "Dark"]].map(([m, l]) =>
+          h("button", { class: "btn", "aria-pressed": String(mode === m), onclick: () => setMode(m) }, l)))),
+      h("div", { class: "field", style: "margin-bottom:0" }, h("label", null, "Accent colour"),
+        h("div", { class: "swatches", role: "group", "aria-label": "Accent colour" }, HUES.map(([n, v]) =>
+          h("button", { class: "swatch", style: `--sw:${v}`, title: n, "aria-label": n, "aria-pressed": String(hue === v), onclick: () => setHue(v) }, ic("check")))))),
+    h("div", { class: "panel", style: "max-width:560px" }, h("h3", null, "Change password"),
       h("div", { class: "field" }, h("label", { for: "pc" }, "Current password"), cur),
       h("div", { class: "field" }, h("label", { for: "pn" }, "New password (8+ characters)"), nw),
       h("button", { class: "btn primary", onclick: async () => { try { await api("POST", "/api/password", { current: cur.value, new: nw.value }); cur.value = nw.value = ""; msg.textContent = ""; toast("Password changed"); } catch (e) { msg.textContent = e.message; } } }, "Update"), msg),
-    h("div", { class: "panel", style: "max-width:420px" }, h("h3", null, "About"), h("p", { class: "muted" }, "TV Manager " + (S.version || "") + " · manages Android TVs over ADB.")));
+    h("div", { class: "panel", style: "max-width:560px" }, h("h3", null, "About"), h("p", { class: "muted" }, "TV Manager " + (S.version || "") + " · manages Android TVs over ADB.")));
 }
 
 start().catch(() => showLogin());

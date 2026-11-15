@@ -1,5 +1,15 @@
 # Using the dashboard
 
+## Look and feel
+
+The UI follows Google's Material 3 Expressive guidelines: a navigation rail on wide screens that turns into a
+bottom bar on phones, one contextual floating action button (Add device / New schedule), large rounded
+shapes that morph on press, connected button groups, and avatars whose shape reflects the TV's state.
+
+**Settings → Appearance** chooses *Auto / Light / Dark* and an **accent colour** (blue, teal, green, amber,
+rose, violet). The whole palette is generated from that seed hue, in both light and dark. The choice is kept in
+the browser, so each person can have their own. Motion respects the OS "reduce motion" setting.
+
 ## Devices
 
 Each card shows the TV's state (**On**, **Standby**, **Offline**, **Needs approval on TV**), model and

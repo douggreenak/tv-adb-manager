@@ -41,6 +41,14 @@ To support a new command, add a branch in `shell()`; to model a new TV, add an e
 3. If the input id doesn't match `PASSTHRU` in `parsers.py`, extend it.
 4. Verify that `am start -a android.intent.action.VIEW -d content://android.media.tv/passthrough/<id>` switches the input.
 
+## Theming
+
+`web/style.css` defines Material 3 tonal roles (`--primary`, `--surface-container`, ...) as `oklch()` values
+derived from one hue variable `--h`, declared three times: light, dark via `prefers-color-scheme`, and dark via
+`[data-theme="dark"]`. To retune the palette change the lightness/chroma numbers there; to add an accent
+option add a pair to `HUES` in `web/app.js`. Icons are inline Material path data in `ICONS`, built with
+`createElementNS` (no `innerHTML`). The only bundled asset is the Roboto Flex variable font in `web/fonts/`.
+
 ## Conventions
 
 Standard library only on the server; plain JS in the UI; every dynamic string rendered through `textContent`;

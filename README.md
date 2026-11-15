@@ -15,11 +15,16 @@ for sets that have no MDM. Built for locked-down or "debloated" TVs (Hisense, TC
 * **Shell**: run `adb shell` commands from the browser, with history and quick commands.
 * **Schedules**: wake, standby, reboot, go Home or switch input at set times.
 * **Activity log**, **device info** (storage, memory, uptime, IP), password login.
+* **Material 3 Expressive design**: tonal dynamic colour from a seed hue you pick, light/dark/auto, navigation rail
+  that becomes a bottom bar on phones, side sheet that becomes a bottom sheet, springy shape-morphing motion.
 
 Pure Python 3 standard library on the server, plain JS in the browser. No dependencies, no build step.
 
 ![Fleet view](docs/images/devices.png)
-![Inputs and power-on restore](docs/images/inputs.png)
+
+| Inputs and power-on restore | Dark theme, teal accent | Phone |
+|---|---|---|
+| ![Inputs](docs/images/inputs.png) | ![Dark](docs/images/devices-dark.png) | ![Phone](docs/images/mobile.png) |
 
 *Screenshots use the simulated fleet from `tools/fake_adb.py`.*
 
@@ -114,4 +119,5 @@ experiments/ an on-device Android app that was tried first and abandoned (see it
 
 ## License
 
-MIT
+MIT. Third-party: the UI bundles [Roboto Flex](https://github.com/googlefonts/roboto-flex) (SIL OFL 1.1, licence in
+`web/fonts/OFL.txt`) and inlines Material Icons path data (Apache-2.0).

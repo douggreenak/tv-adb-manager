@@ -44,7 +44,8 @@ Devices also carry `tv_name` (the name the TV reports, or null) and `auto_name` 
 ### Live screen view
 
 `GET /api/devices/<id>/live?quality=low|medium|high` returns a `multipart/x-mixed-replace` stream of JPEG frames (boundary
-`frame`, each part has `Content-Length`), so it also works in a plain `<img src>`. Only the newest frame is sent, so a slow
+`frame`, each part has `Content-Length`), so it also works in a plain `<img src>`. Add `&raw=1` to get the same bytes as
+`application/octet-stream`: Safari's `fetch()` refuses `multipart/x-mixed-replace`. Only the newest frame is sent, so a slow
 client skips frames instead of lagging. Errors are normal JSON: `409` TV unreachable, `501` ffmpeg missing, `502` the TV
 produced no video (the TV's own message is included), `429` too many live views. Sessions end after 30 minutes.
 

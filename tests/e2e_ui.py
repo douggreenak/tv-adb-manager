@@ -15,6 +15,11 @@ atexit.register(server.terminate)   # never leave the helper server behind, even
 time.sleep(2)
 ctl = lambda *a: subprocess.run([sys.executable, FAKE, "ctl", *a], capture_output=True, text=True).stdout
 errs = []
+
+def assert_clean(pg, where):
+    txt = pg.inner_text("body")
+    m = re.search(r"(^|\n)\s*(null|undefined|NaN)\s*(\n|$)", txt)
+    assert not m, "literal %r leaked onto the page at: %s" % (m.group(2), where)
 with sync_playwright() as p:
     b = p.chromium.launch()
     pg = b.new_page(viewport={"width": 1280, "height": 860})
@@ -63,9 +68,9 @@ with sync_playwright() as p:
     pg.set_input_files("#apkf", OUT + "/t.apk"); pg.click("text=Upload & install"); pg.wait_for_selector("pre.out:has-text('Success')")
     # shell + info
     pg.click("role=tab[name='Shell']"); pg.click(".chip:has-text('Disabled packages')"); pg.wait_for_selector("pre.out:has-text('tvlauncher')")
-    pg.click("role=tab[name='Info']"); pg.wait_for_selector("text=Storage"); pg.screenshot(path=OUT + "/f_info.png")
+    pg.click("role=tab[name='Info']"); pg.wait_for_selector("text=Storage"); assert_clean(pg, "Info tab"); pg.screenshot(path=OUT + "/f_info.png")
     # live screen view: the simulated TV streams a test pattern (screenrecord -> ffmpeg -> JPEG frames)
-    pg.click("role=tab[name='Screen']"); pg.screenshot(path=OUT + "/f_screen_idle.png"); pg.click(".viewer-overlay .big-play")
+    pg.click("role=tab[name='Screen']"); assert_clean(pg, "Screen tab, TV not on HDMI"); pg.screenshot(path=OUT + "/f_screen_idle.png"); pg.click(".viewer-overlay .big-play")
     for _ in range(100):      # wait for a real decoded frame (the page CSP forbids wait_for_function's string eval)
         if pg.locator(".live-img:not(.hidden)").count() and pg.eval_on_selector(".live-img", "el => el.naturalWidth") > 200:
             break
@@ -78,7 +83,7 @@ with sync_playwright() as p:
     pg.click(".viewer-tools >> text=Stop"); expect(pg.locator(".viewer-overlay .big-play")).to_be_visible()
     pg.keyboard.press("Escape")
     pg.locator(".card[aria-label='Open Cafe']").click(); pg.wait_for_selector(".drawer"); pg.click("role=tab[name='Screen']"); pg.click(".viewer-overlay .big-play")
-    expect(pg.locator(".viewer-msg")).to_contain_text("No video from the TV", timeout=20000); pg.screenshot(path=OUT + "/f_screen_error.png"); pg.keyboard.press("Escape")
+    expect(pg.locator(".viewer-msg")).to_contain_text("No video from the TV", timeout=20000); assert_clean(pg, "Screen error state"); pg.screenshot(path=OUT + "/f_screen_error.png"); pg.keyboard.press("Escape")
     # standby -> wake -> expect auto restore of Soundbar on Lobby
     pg.locator(".card[aria-label='Open Lobby'] >> text=Standby").click(); pg.wait_for_timeout(3500)
     expect(pg.locator(".card[aria-label='Open Lobby'] .status")).to_have_text("Standby")
@@ -92,7 +97,7 @@ with sync_playwright() as p:
     pg.click(".modal .chip:has-text('Lobby')"); pg.click(".modal >> text=Save"); pg.wait_for_selector(".sched:has-text('Morning on')")
     pg.screenshot(path=OUT + "/f_sched.png")
     # activity log
-    pg.click("nav >> text=Activity"); pg.wait_for_selector(".ev:has-text('restored input')"); pg.screenshot(path=OUT + "/f_activity.png")
+    pg.click("nav >> text=Activity"); pg.wait_for_selector(".ev:has-text('restored input')"); assert_clean(pg, "Activity"); pg.screenshot(path=OUT + "/f_activity.png")
     # change password + relogin
     pg.click("nav >> text=Settings"); pg.fill("#pc", "testpass123"); pg.fill("#pn", "newpass4567"); pg.click("text=Update"); pg.wait_for_selector("text=Password changed")
     # appearance: dark theme + teal accent, then back to the devices page
@@ -106,6 +111,18 @@ with sync_playwright() as p:
     # mobile layout
     pg.set_viewport_size({"width": 390, "height": 800}); pg.click("nav >> text=Devices"); pg.wait_for_timeout(1500); pg.screenshot(path=OUT + "/f_mobile.png")
     pg.locator(".card[aria-label='Open Lobby']").click(); pg.wait_for_selector(".drawer"); pg.wait_for_timeout(900); pg.screenshot(path=OUT + "/f_mobile_sheet.png")
+    # Safari-style browser: fetch() has no streaming body, so the viewer must fall back to a plain <img>
+    pg2 = b.new_context(viewport={"width": 1280, "height": 860}).new_page(); pg2.set_default_timeout(15000)
+    pg2.add_init_script("Object.defineProperty(Response.prototype, 'body', { get() { return null; } });")
+    pg2.goto("http://127.0.0.1:8431/?nosso"); pg2.fill("#pw", "newpass4567"); pg2.press("#pw", "Enter")
+    pg2.locator(".card[aria-label='Open Lobby']").click(); pg2.click("role=tab[name='Screen']"); pg2.click(".viewer-overlay .big-play")
+    for _ in range(100):
+        if pg2.locator(".live-img:not(.hidden)").count() and pg2.eval_on_selector(".live-img", "el => el.naturalWidth") > 200:
+            break
+        pg2.wait_for_timeout(250)
+    else:
+        raise AssertionError("img fallback never showed a frame")
+    expect(pg2.locator(".live-badge")).to_be_visible(); pg2.screenshot(path=OUT + "/f_screen_imgfallback.png")
     b.close()
 server.terminate()
 print("UI flow OK (screenshots in %s); errors:" % TMP, errs or "none")

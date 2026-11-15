@@ -3,6 +3,13 @@
 
 const $ = (s, el = document) => el.querySelector(s);
 
+/* DOM's append/replaceChildren print `null` and `false` as literal text. Skip empty values so a conditional child
+   (`cond ? el : null`) can never leak the word "null" onto the page. */
+for (const m of ["append", "prepend", "replaceChildren"]) {
+  const native = Element.prototype[m];
+  Element.prototype[m] = function (...kids) { return native.apply(this, kids.filter(k => k != null && k !== false)); };
+}
+
 function h(tag, attrs, ...kids) {
   const el = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs || {})) {
@@ -517,20 +524,29 @@ function tabScreen(body, d) {
     if (last) show(new Blob([last], { type: "image/jpeg" }));
     return pos ? buf.slice(pos) : buf;
   }
+  /* Fallback for browsers that cannot stream a fetch() body: let an <img> read the multipart stream itself. */
+  function startWithImg() {
+    const mine = ctrl = new AbortController();
+    mine.signal.addEventListener("abort", () => img.removeAttribute("src"));           // dropping the src closes the connection
+    img.onload = () => { if (ctrl === mine) { img.classList.remove("hidden"); ui("live"); count++; } };
+    img.onerror = () => { if (ctrl === mine) { ctrl = null; img.classList.add("hidden"); ui("error", "Couldn't start the live view. The TV may be unreachable or not allow screen capture."); } };
+    img.src = `/api/devices/${d.id}/live?quality=${quality.value}&t=${Date.now()}`;
+  }
   async function start() {
     if (ctrl) ctrl.abort();
     userStopped = false; const mine = ctrl = new AbortController(); count = 0;
     ui("connecting");
     try {
-      const r = await fetch(`/api/devices/${d.id}/live?quality=${quality.value}`, { credentials: "same-origin", signal: mine.signal });
+      const r = await fetch(`/api/devices/${d.id}/live?quality=${quality.value}&raw=1`, { credentials: "same-origin", signal: mine.signal });
       if (!r.ok) { let m = "HTTP " + r.status; try { m = (await r.json()).error || m; } catch (e) { /* not json */ } throw new Error(cap(m)); }
+      if (!r.body || !r.body.getReader) return startWithImg();                          // e.g. older Safari
       ui("live");
       const reader = r.body.getReader(); let buf = new Uint8Array(0);
       for (;;) { const { done, value } = await reader.read(); if (done) break; buf = drain(concatBytes(buf, value)); }
       if (ctrl === mine && !userStopped) { ctrl = null; ui("ended", "The live view stopped. It ends by itself after 30 minutes."); }
     } catch (e) {
       if (mine.signal.aborted) return;
-      ctrl = null; ui("error", e.message === "Failed to fetch" ? "Lost the connection to the manager." : e.message);
+      ctrl = null; ui("error", /^(Failed to fetch|Load failed|NetworkError)/i.test(e.message) ? "Lost the connection to the manager." : e.message);
     }
   }
   function stop() { userStopped = true; if (ctrl) ctrl.abort(); ctrl = null; img.classList.add("hidden"); ui("idle"); }

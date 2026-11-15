@@ -478,7 +478,10 @@ def r_live(h, m, q):
     started = time.time()
     h.close_connection = True
     h.send_response(200)
-    h.send_header("Content-Type", "multipart/x-mixed-replace; boundary=frame")
+    # fetch() readers ask for raw=1: Safari/WebKit cannot fetch multipart/x-mixed-replace ("Load failed"), but an
+    # <img> needs exactly that content type, so the two callers get different headers for the same frames.
+    raw = (q.get("raw") or [""])[0] == "1"
+    h.send_header("Content-Type", "application/octet-stream" if raw else "multipart/x-mixed-replace; boundary=frame")
     h.send_header("Cache-Control", "no-store")
     h.send_header("X-Content-Type-Options", "nosniff")
     h.send_header("Connection", "close")

@@ -14,7 +14,11 @@ Test layers:
 * `tests/test_monitor.py`: the restore state machine against a scripted fake adb.
 * `tests/test_api.py`: the HTTP server on an ephemeral port (auth, CSRF, validation, traversal, bulk, install, schedules).
 * `tests/test_fake_fleet.py`: the real `Monitor` and `Adb` classes driving `tools/fake_adb.py` through standby, power loss, reboot and "user opened an app" scenarios.
-* `tests/e2e_ui.py`: Chromium drives the real UI against a throwaway manager and the fake fleet.
+* `tests/e2e_ui.py`: Chromium drives the real UI against a throwaway manager and the fake fleet, and fails if a literal
+  `null`/`undefined` ever appears on a page.
+* `tests/e2e_live_webkit.py`: the live view in WebKit. Safari's `fetch()` cannot read `multipart/x-mixed-replace` ("Load failed"), so
+  the viewer requests `?raw=1` and falls back to an `<img>`; only a WebKit run catches regressions there
+  (`playwright install webkit`, plus `playwright install-deps webkit` on Linux).
 
 ## The fake fleet
 

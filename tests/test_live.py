@@ -123,6 +123,14 @@ class LiveApiTests(unittest.TestCase):
         self.assertTrue(ev and ev[0]["level"] == "error" and "no encoder" in ev[0]["msg"])   # and the Activity log
 
     @unittest.skipUnless(FFMPEG, "ffmpeg not installed")
+    def test_content_type_depends_on_the_caller(self):
+        for qs, expect in (("", "multipart/x-mixed-replace"), ("&raw=1", "application/octet-stream")):
+            resp = self.get("/api/devices/%s/live?quality=low%s" % (self.dev["id"], qs))
+            ctype = resp.headers["Content-Type"]
+            resp.close()
+            self.assertTrue(ctype.startswith(expect), (qs, ctype))      # <img> needs multipart; Safari's fetch needs raw
+
+    @unittest.skipUnless(FFMPEG, "ffmpeg not installed")
     def test_static_screen_still_shows_and_stays_alive(self):
         self.adb.live_mode = "static"
         try:

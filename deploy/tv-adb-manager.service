@@ -1,0 +1,16 @@
+[Unit]
+Description=TV ADB Manager (web dashboard + last-input restore)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=tvmanager
+WorkingDirectory=/opt/tv-adb-manager
+Environment=HOME=/var/lib/tvmanager
+# Optional: Environment=TVM_PORT=8420  TVM_HOST=0.0.0.0  TVM_PASSWORD=...
+ExecStart=/usr/bin/python3 -m tvmanager
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -457,6 +457,7 @@ def r_live(h, m, q):
         raise ApiError(400, "quality must be low, medium or high")
     sess = frame = None
     err = ""
+    got_bytes = 0
     for size in (preset["size"], None):      # preset first, then the TV's native size (some TVs reject odd sizes)
         try:
             sess = a.live.open(d["id"], a.adb.screenrecord_argv(d["addr"], size, preset["bitrate"]), preset, ff)
@@ -466,8 +467,11 @@ def r_live(h, m, q):
         if frame is not None:
             break
         err = sess.error_text() or err
+        got_bytes = max(got_bytes, sess.bytes_in)
         a.live.release(d["id"], sess)
     if frame is None:
+        if not err and got_bytes:
+            err = "The TV sent video headers but no picture. It is probably showing an HDMI input, which can't be captured."
         a.events.add(d["name"], "live view failed: %s" % (err or "the TV produced no video"), "error")
         raise ApiError(502, "No video from the TV. " + (err if err else "It may not allow screen capture."))
     a.events.add(d["name"], "live view started (%s)" % name)
@@ -483,7 +487,7 @@ def r_live(h, m, q):
         while frame is not None:
             h.wfile.write(b"--frame\r\nContent-Type: image/jpeg\r\nContent-Length: %d\r\n\r\n" % len(frame) + frame + b"\r\n")
             h.wfile.flush()
-            seq, frame = sess.next_frame(seq, timeout=15)
+            seq, frame = sess.next_frame(seq, timeout=4, repeat=True)     # repeat = keep-alive while the screen is static
     except (BrokenPipeError, ConnectionResetError, OSError):
         pass
     finally:

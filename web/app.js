@@ -545,7 +545,8 @@ function tabScreen(body, d) {
   const kb = h("input", { type: "checkbox", class: "switch", role: "switch", id: "kbscreen", "aria-label": "Use keyboard" });
   keyboardControl(d, kb);
   ui("idle");
-  body.append(h("div", { class: "panel" }, viewer,
+  body.append(d.input_name ? h("div", { class: "note" }, ic("info"), h("span", { class: "grow" }, `This TV is showing the HDMI input “${d.input_name}”. TVs don't allow its video to be captured, so the view will be black. The interface and apps can be viewed.`)) : null,
+    h("div", { class: "panel" }, viewer,
     h("div", { class: "viewer-tools" }, toggle, selectField(quality, true),
       h("button", { class: "icon-btn", "aria-label": "Save snapshot", title: "Save snapshot", onclick: snapshot }, ic("camera")),
       h("button", { class: "icon-btn", "aria-label": "Fullscreen", title: "Fullscreen", onclick: () => viewer.requestFullscreen && viewer.requestFullscreen() }, ic("fullscreen"))),

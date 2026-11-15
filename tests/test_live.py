@@ -123,6 +123,31 @@ class LiveApiTests(unittest.TestCase):
         self.assertTrue(ev and ev[0]["level"] == "error" and "no encoder" in ev[0]["msg"])   # and the Activity log
 
     @unittest.skipUnless(FFMPEG, "ffmpeg not installed")
+    def test_static_screen_still_shows_and_stays_alive(self):
+        self.adb.live_mode = "static"
+        try:
+            resp = self.get("/api/devices/%s/live?quality=low" % self.dev["id"])
+            data = b""
+            end = time.time() + 20
+            while data.count(b"\xff\xd8") < 2 and time.time() < end:      # first frame, then a keep-alive repeat
+                data += resp.read1(65536)
+            resp.close()
+        finally:
+            self.adb.live_mode = "continuous"
+        self.assertGreaterEqual(data.count(b"\xff\xd8"), 2)
+
+    @unittest.skipUnless(FFMPEG, "ffmpeg not installed")
+    def test_headers_without_a_picture_explains_hdmi(self):
+        self.adb.live_mode = "headers"
+        try:
+            code, msg = self.err("/api/devices/%s/live?quality=low" % self.dev["id"])
+        finally:
+            self.adb.live_mode = "continuous"
+        self.assertEqual(code, 502)
+        self.assertIn("HDMI", msg)
+        self.assertEqual(self.app.live.count(), 0)
+
+    @unittest.skipUnless(FFMPEG, "ffmpeg not installed")
     def test_retries_with_native_size_when_the_preset_size_is_rejected(self):
         self.adb.live_fail_sized = True
         try:

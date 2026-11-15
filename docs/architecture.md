@@ -35,9 +35,15 @@ read once per connection from `getprop` and `Settings.Secure tv_input_custom_lab
 ## Live view pipeline
 
 ```
-TV: screenrecord --output-format=h264  ->  adb exec-out  ->  ffmpeg (h264 -> JPEG, scaled, fps-limited)  ->  server keeps
-the newest frame  ->  HTTP multipart stream  ->  browser parses frames and paints an <img>
+TV: screenrecord --output-format=h264  ->  adb exec-out  ->  server keeps the H.264 since the last key frame
+  ->  when the stream goes quiet (or a frame interval passes) a fresh ffmpeg decodes that sequence to JPEG
+  ->  newest frame wins  ->  HTTP multipart stream  ->  browser parses frames and paints an <img>
 ```
+
+TV encoders send a frame only when the picture *changes*, and ffmpeg's raw-H.264 reader holds the latest frame back until
+more data arrives, so a long-running ffmpeg never shows a static screen (verified on real TVs). Decoding short sequences
+with a fresh ffmpeg per frame flushes the last frame on end-of-input. The cost is a ~0.1 s process per rendered frame,
+rate-limited by the quality preset (4 / 6 / 10 fps).
 
 `tvmanager/live.py` owns the pipeline. `screenrecord` stops after 3 minutes, so it is restarted into the same ffmpeg
 (each run begins with fresh SPS/PPS and a key frame). The server transcodes because browsers only decode H.264 over

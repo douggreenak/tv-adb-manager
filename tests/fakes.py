@@ -35,6 +35,12 @@ class FakeAdb:
         self.calls.append(("screenrecord", addr, size))
         if getattr(self, "live_fail", False) or (size and getattr(self, "live_fail_sized", False)):
             return ["sh", "-c", "echo 'ERROR: no encoder' >&2; exit 1"]
+        mode = getattr(self, "live_mode", "continuous")
+        enc = "ffmpeg -nostdin -loglevel error -f lavfi -i testsrc2=size=%s:rate=15 -frames:v %%d -c:v libx264 -preset ultrafast -tune zerolatency -g 15 -pix_fmt yuv420p -f h264 -" % (size or "320x180")
+        if mode == "static":       # what a static TV screen does: one frame, then silence
+            return ["sh", "-c", (enc % 1) + "; sleep 20"]
+        if mode == "headers":      # what the TCL does on HDMI: parameter sets only, never a picture
+            return ["sh", "-c", (enc % 3) + " 2>/dev/null | head -c 70; sleep 20"]
         return ["ffmpeg", "-nostdin", "-loglevel", "error", "-re", "-f", "lavfi", "-i", "testsrc2=size=%s:rate=15" % (size or "320x180"),
                 "-t", "8", "-c:v", "libx264", "-preset", "ultrafast", "-tune", "zerolatency", "-g", "15", "-pix_fmt", "yuv420p", "-f", "h264", "-"]
 

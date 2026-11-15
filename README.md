@@ -18,6 +18,19 @@ for sets that have no MDM. Built for locked-down or "debloated" TVs (Hisense, TC
 
 Pure Python 3 standard library on the server, plain JS in the browser. No dependencies, no build step.
 
+![Fleet view](docs/images/devices.png)
+![Inputs and power-on restore](docs/images/inputs.png)
+
+*Screenshots use the simulated fleet from `tools/fake_adb.py`.*
+
+## Documentation
+
+* [Setup guide](docs/setup.md): preparing TVs, installing, systemd, HTTPS
+* [Using the dashboard](docs/features.md): every screen and the power-on restore logic
+* [HTTP API](docs/api.md): script it with curl
+* [Architecture](docs/architecture.md): how polling and restore work, and why it runs on a server
+* [Security](docs/security.md) · [Troubleshooting](docs/troubleshooting.md) · [Development](docs/development.md)
+
 ## Quick start
 
 Requirements: Python 3.9+, `adb` on the PATH, TVs with *Developer options → ADB debugging (network)* on.

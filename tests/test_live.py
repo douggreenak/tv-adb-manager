@@ -105,6 +105,10 @@ class LiveApiTests(unittest.TestCase):
         self.assertEqual(self.err(url + "?quality=ultra")[0], 400)
         self.app.monitor.states[self.dev["id"]] = {"status": "offline"}
         self.assertEqual(self.err(url)[0], 409)
+        self.app.monitor.states[self.dev["id"]] = {"status": "asleep"}
+        code, msg = self.err(url)
+        self.assertEqual(code, 409)
+        self.assertIn("standby", msg)                                  # no picture to show while the TV sleeps
         self.app.monitor.states[self.dev["id"]] = {"status": "online"}
         with mock.patch("tvmanager.live.ffmpeg_path", return_value=None):
             code, msg = self.err(url)

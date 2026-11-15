@@ -451,6 +451,8 @@ def r_live(h, m, q):
     st = a.monitor.snapshot(d["id"]) or {}
     if st.get("status") not in ("online", "asleep"):
         raise ApiError(409, "The TV is not reachable")
+    if st.get("status") == "asleep":
+        raise ApiError(409, "The TV is in standby, so there is no picture to show. Wake it first.")
     name = (q.get("quality") or ["medium"])[0]
     preset = livemod.PRESETS.get(name)
     if not preset:
@@ -473,7 +475,8 @@ def r_live(h, m, q):
         if not err and got_bytes:
             err = "The TV sent video headers but no picture. It is probably showing an HDMI input, which can't be captured."
         a.events.add(d["name"], "live view failed: %s" % (err or "the TV produced no video"), "error")
-        raise ApiError(502, "No video from the TV. " + (err if err else "It may not allow screen capture."))
+        raise ApiError(502, "No video from the TV. " + (err if err else
+                       "It sent nothing for 8 seconds. It may be going to standby or busy, or it may not allow screen capture."))
     a.events.add(d["name"], "live view started (%s)" % name)
     started = time.time()
     h.close_connection = True

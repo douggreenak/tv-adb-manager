@@ -22,6 +22,7 @@ def new_tv(model, mfr, android, inputs, labels=None, app=HISENSE_APP, state="dev
     return {"reachable": True, "auth": state, "connected": False, "boot_at": time.time() - 3600, "up_at": 0,
             "awake": True, "session": None, "top": LAUNCHER, "mfr": mfr, "model": model, "android": android,
             "inputs": inputs, "labels": labels or {}, "tvapp": app, "launcher": LAUNCHER,
+            "capture": {"screencap": True, "screenrecord": True},
             "packages": {"com.leanbitlab.ltvL": {"disabled": False, "system": False},
                          "com.google.android.tvlauncher": {"disabled": True, "system": True},
                          "com.android.vending": {"disabled": True, "system": True},
@@ -34,10 +35,10 @@ def seed():
     return {
         "10.0.0.11:5555": new_tv("SmartTV 4K", "Hisense", "11", hdmi_inputs(HS + "HW", 3) + [{"id": "com.hisense.tv.hitvinput/.tuner.TunerTvInputService/HW0", "state": "connected"}],
                                   {HS + "HW1": "Front Desk", HS + "HW2": "Soundbar"}),
-        "10.0.0.12:5555": new_tv("SmartTV", "Hisense", "14", [{"id": "com.mediatek.tvinput/.hdmi.HDMIInputService/HDMI100004", "state": "connected"},
-                                                              {"id": "com.mediatek.tvinput/.hdmi.HDMIInputService/HDMI100005", "state": "standby"}]),
-        "10.0.0.13:5555": new_tv("Smart TV", "TCL", "12", hdmi_inputs("com.tcl.tvinput/.TvPassThroughService/HW", 2) + [{"id": "com.tcl.tvinput/.TunerInputService/HW2", "state": "connected"}],
-                                  app="com.tcl.tv/com.tcl.player.TVActivity"),
+        "10.0.0.12:5555": dict(new_tv("SmartTV", "Hisense", "14", [{"id": "com.mediatek.tvinput/.hdmi.HDMIInputService/HDMI100004", "state": "connected"},
+                                                              {"id": "com.mediatek.tvinput/.hdmi.HDMIInputService/HDMI100005", "state": "standby"}]), capture={"screencap": False, "screenrecord": True}),
+        "10.0.0.13:5555": dict(new_tv("Smart TV", "TCL", "12", hdmi_inputs("com.tcl.tvinput/.TvPassThroughService/HW", 2) + [{"id": "com.tcl.tvinput/.TunerInputService/HW2", "state": "connected"}],
+                                  app="com.tcl.tv/com.tcl.player.TVActivity"), capture={"screencap": False, "screenrecord": False}),
         "10.0.0.14:5555": new_tv("SmartTV 4K", "Hisense", "11", hdmi_inputs(HS + "HW", 2), state="unauthorized"),
         "10.0.0.15:5555": dict(new_tv("SmartTV", "Hisense", "11", hdmi_inputs(HS + "HW", 2)), reachable=False),
     }
@@ -251,7 +252,15 @@ def run(argv):
                 rc, out = shell(t, " ".join(rest))
                 return rc, out, b""
             if op == "exec-out" and rest[:1] == ["screencap"]:
+                if not t.get("capture", {}).get("screencap", True):
+                    return 0, b"", b""          # what the real TVs do: exit 0, no bytes
                 return 0, test_card_png(), b""
+            if op == "exec-out" and rest[:1] == ["screenrecord"]:
+                if not t.get("capture", {}).get("screenrecord", True):
+                    return 1, b"", b"ERROR: unable to get display capture (err=-22)\n"
+                size = rest[rest.index("--size") + 1] if "--size" in rest else "1280x720"
+                tl = int(rest[rest.index("--time-limit") + 1]) if "--time-limit" in rest else 180
+                return None, ("stream", size, min(tl, int(os.environ.get("FAKE_SCREENRECORD_MAX", "180")))), b""
             if op == "install":
                 return 0, "Performing Streamed Install\nSuccess\n", b""
             if op == "reboot":
@@ -291,6 +300,13 @@ if __name__ == "__main__":
         ctl(sys.argv[2:])
     else:
         rc, out, err = run(sys.argv[1:])
+        if rc is None:                       # screenrecord: stream a test pattern as raw H.264 (lock already released)
+            _, size, tl = out
+            os.execvp("ffmpeg", ["ffmpeg", "-nostdin", "-loglevel", "error", "-re", "-f", "lavfi", "-i",
+                                 "testsrc2=size=%s:rate=15" % size, "-t", str(tl), "-c:v", "libx264", "-preset", "ultrafast",
+                                 "-tune", "zerolatency", "-g", "15", "-pix_fmt", "yuv420p", "-f", "h264", "-"])
+        if err:
+            sys.stderr.buffer.write(err if isinstance(err, bytes) else err.encode())
         if isinstance(out, bytes):
             sys.stdout.buffer.write(out)
         else:

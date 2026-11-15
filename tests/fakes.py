@@ -31,6 +31,13 @@ class FakeAdb:
         self.calls.append(("install", addr, path))
         return self.install_result
 
+    def screenrecord_argv(self, addr, size, bitrate):
+        self.calls.append(("screenrecord", addr, size))
+        if getattr(self, "live_fail", False):
+            return ["sh", "-c", "echo 'ERROR: no encoder' >&2; exit 1"]
+        return ["ffmpeg", "-nostdin", "-loglevel", "error", "-re", "-f", "lavfi", "-i", "testsrc2=size=%s:rate=15" % size,
+                "-t", "8", "-c:v", "libx264", "-preset", "ultrafast", "-tune", "zerolatency", "-g", "15", "-pix_fmt", "yuv420p", "-f", "h264", "-"]
+
     def reboot(self, addr):
         self.calls.append(("reboot", addr))
         return 0, ""

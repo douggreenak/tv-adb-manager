@@ -1,5 +1,17 @@
 # Using the dashboard
 
+## Screen (live view)
+
+The **Screen** tab streams what the TV is showing. Press **Start live view**, pick *Low (480p, 6 fps)*,
+*Medium (720p, 10 fps)* or *High (1080p, 15 fps)*, save a snapshot with the camera button, or go fullscreen.
+Below the picture is a mini remote (Back, arrows, OK, Home) and a keyboard switch, so you can navigate while watching.
+
+* It works by recording the TV's screen with `screenrecord`, so it needs a TV whose firmware allows screen capture.
+  Many TVs show the interface and apps fine but block the video layer, so **HDMI inputs and DRM video such as Netflix
+  are usually black or not capturable**. The tab says so when a TV refuses.
+* A live view ends by itself after 30 minutes (press **Resume**), at most 4 TVs can be watched at once, and starting and
+  ending a view is written to *Activity*.
+
 ## Look and feel
 
 The UI follows Google's Material 3 Expressive guidelines: a navigation rail on wide screens that turns into a

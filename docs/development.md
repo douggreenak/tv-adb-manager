@@ -5,6 +5,9 @@ python3 -m unittest discover -s . -p "test_*.py" -t .     # 28 tests, about 5 s,
 python3 tests/e2e_ui.py                                    # browser test; pip install playwright
 ```
 
+Live view tests (`tests/test_live.py`) run real ffmpeg against a simulated `screenrecord` and are skipped if ffmpeg is missing.
+`tools/fake_adb.py` has three capture modes: `10.0.0.11` supports everything, `10.0.0.12` only `screenrecord`, `10.0.0.13` nothing.
+
 Test layers:
 
 * `tests/test_parsers.py`: parsers and validators, using real `dumpsys` captures as fixtures.

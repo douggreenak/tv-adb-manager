@@ -14,6 +14,7 @@ from . import __version__
 from . import parsers as P
 from .adb import Adb
 from .auth import Auth
+from . import live as livemod
 from .monitor import Monitor, launch_input
 from .scheduler import Scheduler, validate as validate_schedule
 from .store import EventLog, Store
@@ -40,6 +41,7 @@ class App:
         self.auth = Auth(data_dir, env_password, log=lambda m: print(m, flush=True))
         self.monitor = Monitor(self.adb, self.store, self.events, poll=poll)
         self.scheduler = Scheduler(self.store, self.events, self.run_action)
+        self.live = livemod.LiveManager()
         self.started = time.time()
         if start_threads:
             self.monitor.start()
@@ -431,6 +433,51 @@ def r_screenshot(h, m, q):
     if not png:
         raise ApiError(502, "screenshot failed (device asleep or protected content)")
     h._send(200, png, "image/png")
+
+
+@route("GET", r"/api/devices/(\w+)/live")
+def r_live(h, m, q):
+    """Live view: multipart/x-mixed-replace stream of JPEG frames (also works directly in an <img>)."""
+    a = h.app
+    d = a.require_device(m.group(1))
+    ff = livemod.ffmpeg_path()
+    if not ff:
+        raise ApiError(501, "Live view needs ffmpeg on the server (sudo apt install ffmpeg)")
+    st = a.monitor.snapshot(d["id"]) or {}
+    if st.get("status") not in ("online", "asleep"):
+        raise ApiError(409, "The TV is not reachable")
+    name = (q.get("quality") or ["medium"])[0]
+    preset = livemod.PRESETS.get(name)
+    if not preset:
+        raise ApiError(400, "quality must be low, medium or high")
+    try:
+        sess = a.live.open(d["id"], a.adb.screenrecord_argv(d["addr"], preset["size"], preset["bitrate"]), preset, ff)
+    except livemod.LiveError as e:
+        raise ApiError(429, str(e))
+    seq, frame = sess.next_frame(0, timeout=10)
+    if frame is None:
+        err = sess.error_text()
+        a.live.release(d["id"], sess)
+        raise ApiError(502, "No video from the TV. " + (err if err else "It may not allow screen capture."))
+    a.events.add(d["name"], "live view started (%s)" % name)
+    started = time.time()
+    h.close_connection = True
+    h.send_response(200)
+    h.send_header("Content-Type", "multipart/x-mixed-replace; boundary=frame")
+    h.send_header("Cache-Control", "no-store")
+    h.send_header("X-Content-Type-Options", "nosniff")
+    h.send_header("Connection", "close")
+    h.end_headers()
+    try:
+        while frame is not None:
+            h.wfile.write(b"--frame\r\nContent-Type: image/jpeg\r\nContent-Length: %d\r\n\r\n" % len(frame) + frame + b"\r\n")
+            h.wfile.flush()
+            seq, frame = sess.next_frame(seq, timeout=15)
+    except (BrokenPipeError, ConnectionResetError, OSError):
+        pass
+    finally:
+        a.live.release(d["id"], sess)
+        a.events.add(d["name"], "live view ended after %ds" % (time.time() - started))
 
 
 @route("POST", r"/api/devices/(\w+)/shell")

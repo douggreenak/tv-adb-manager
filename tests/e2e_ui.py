@@ -51,7 +51,7 @@ with sync_playwright() as p:
     assert "HW2" in ctl("list")
     # keyboard remote
     pg.click("role=tab[name='Remote']"); pg.check("#kbctl"); pg.keyboard.press("ArrowDown")
-    pg.wait_for_selector("img.shot:not(.hidden)", timeout=8000); pg.screenshot(path=OUT + "/f_remote.png")
+    pg.screenshot(path=OUT + "/f_remote.png")
     # apps: disable netflix then re-enable
     pg.click("role=tab[name='Apps']"); pg.wait_for_selector(".row:has-text('com.netflix.ninja')")
     pg.locator(".row:has-text('com.netflix.ninja') >> text=Disable").click(); pg.wait_for_timeout(1500)
@@ -64,7 +64,21 @@ with sync_playwright() as p:
     # shell + info
     pg.click("role=tab[name='Shell']"); pg.click(".chip:has-text('Disabled packages')"); pg.wait_for_selector("pre.out:has-text('tvlauncher')")
     pg.click("role=tab[name='Info']"); pg.wait_for_selector("text=Storage"); pg.screenshot(path=OUT + "/f_info.png")
+    # live screen view: the simulated TV streams a test pattern (screenrecord -> ffmpeg -> JPEG frames)
+    pg.click("role=tab[name='Screen']"); pg.screenshot(path=OUT + "/f_screen_idle.png"); pg.click(".viewer-overlay .big-play")
+    for _ in range(100):      # wait for a real decoded frame (the page CSP forbids wait_for_function's string eval)
+        if pg.locator(".live-img:not(.hidden)").count() and pg.eval_on_selector(".live-img", "el => el.naturalWidth") > 200:
+            break
+        pg.wait_for_timeout(250)
+    else:
+        raise AssertionError("live view never showed a frame")
+    expect(pg.locator(".live-badge")).to_be_visible(); pg.wait_for_timeout(1500); pg.screenshot(path=OUT + "/f_screen_live.png")
+    pg.select_option("select[aria-label='Quality']", "low"); pg.wait_for_timeout(2500)
+    expect(pg.locator(".live-badge")).to_be_visible()
+    pg.click(".viewer-tools >> text=Stop"); expect(pg.locator(".viewer-overlay .big-play")).to_be_visible()
     pg.keyboard.press("Escape")
+    pg.locator(".card[aria-label='Open Cafe']").click(); pg.wait_for_selector(".drawer"); pg.click("role=tab[name='Screen']"); pg.click(".viewer-overlay .big-play")
+    expect(pg.locator(".viewer-msg")).to_contain_text("No video from the TV", timeout=20000); pg.screenshot(path=OUT + "/f_screen_error.png"); pg.keyboard.press("Escape")
     # standby -> wake -> expect auto restore of Soundbar on Lobby
     pg.locator(".card[aria-label='Open Lobby'] >> text=Standby").click(); pg.wait_for_timeout(3500)
     expect(pg.locator(".card[aria-label='Open Lobby'] .status")).to_have_text("Standby")

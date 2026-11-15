@@ -17,6 +17,9 @@ access to those devices.
   `Cache-Control: no-store`. The UI builds all dynamic content with `textContent`, never `innerHTML`.
 * Everything run through the shell tab and every package or power action is written to the activity log.
 
+* **Live view shows the TV's screen** to anyone logged in. Starting and ending a view is recorded in *Activity*, views end
+  after 30 minutes, and at most 4 run at once. Nothing is stored: frames are streamed and discarded.
+
 **What is not**
 
 * No TLS. Use a reverse proxy (see `setup.md`) or keep it on a trusted network.

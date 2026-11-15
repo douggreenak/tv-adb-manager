@@ -32,6 +32,18 @@ adb devices says: unauthorized → status "Needs approval", retry connect every 
 Static details (manufacturer, model, Android version, the TV's custom input names, the home package) are
 read once per connection from `getprop` and `Settings.Secure tv_input_custom_labels`.
 
+## Live view pipeline
+
+```
+TV: screenrecord --output-format=h264  ->  adb exec-out  ->  ffmpeg (h264 -> JPEG, scaled, fps-limited)  ->  server keeps
+the newest frame  ->  HTTP multipart stream  ->  browser parses frames and paints an <img>
+```
+
+`tvmanager/live.py` owns the pipeline. `screenrecord` stops after 3 minutes, so it is restarted into the same ffmpeg
+(each run begins with fresh SPS/PPS and a key frame). The server transcodes because browsers only decode H.264 over
+HTTPS (WebCodecs), while JPEG works everywhere over plain HTTP. The TV's own stderr is kept separate from ffmpeg's so
+the message shown to the user is the TV's ("unable to get display capture"), not ffmpeg jargon.
+
 ## Restore state machine
 
 ```

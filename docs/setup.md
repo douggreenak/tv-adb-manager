@@ -26,6 +26,8 @@ python3 -m tvmanager
 It listens on `0.0.0.0:8420`. The first start prints a generated password, which is also stored hashed in
 `data/auth.json`. To choose your own, start with `TVM_PASSWORD=...` or change it in **Settings**.
 
+Optional: for the live **Screen** view install ffmpeg (`sudo apt install ffmpeg`). Everything else works without it.
+
 ## 3. Run it as a service
 
 Edit `User=`, `WorkingDirectory=` and `ExecStart=` in `deploy/tv-adb-manager.service`, then:

@@ -9,6 +9,9 @@
 | Wake does nothing | The TV must be reachable. If standby cuts the network, use the remote or HDMI-CEC to wake it. |
 | Input not restored after power-on | Check **Activity**: "not restoring input: TV is on …" means the TV started an app, which is left alone. Make sure restore is enabled on the Inputs tab and that an input has been remembered (the *Last input* line on the card). |
 | Restores the wrong input | Pick the right one on the Inputs tab and press **Set as power-on**, or *Forget* and switch to the input you want. |
+| Live view says *No video from the TV* | The TV's firmware doesn't allow `screenrecord`. Try another quality; if it still fails the TV can't be viewed this way. |
+| Live view is black on an HDMI input or in Netflix | The video layer isn't captured; only the interface is. This is a TV limitation, not a manager bug. |
+| Live view says *needs ffmpeg* | Install it on the server: `sudo apt install ffmpeg`. |
 | Screenshot fails (502) | Some TVs block `screencap`, and protected video renders black. Not fixable from the manager. |
 | Install fails with `INSTALL_FAILED_…` | The message is shown in the output box. Common: `VERSION_DOWNGRADE`, `INSUFFICIENT_STORAGE`, or an APK for another ABI. |
 | Can't log in | The password is in `data/auth.json` as a hash. Start once with `TVM_PASSWORD=newpass` to reset it. |

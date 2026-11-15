@@ -6,6 +6,8 @@ for sets that have no MDM. Built for locked-down or "debloated" TVs (Hisense, TC
 * **Fleet view**: live status (on / standby / offline / needs approval), model, Android version,
   current input, foreground app. Groups, search, multi-select and bulk actions.
 * **Remote**: D-pad, volume, media keys, wake/standby/reboot, keyboard control, screenshots.
+* **Screen**: watch what a TV is showing, live, in the browser (needs `ffmpeg` on the server), with snapshot,
+  fullscreen and a mini remote underneath.
 * **Inputs**: list HDMI/tuner inputs (with the TV's own custom labels), switch with one click.
 * **Power-on restore**: remembers each TV's last HDMI input and puts it back after standby wake,
   reboot or power loss. This replaces the "power on to last input" feature that lives in the stock
@@ -38,7 +40,7 @@ Pure Python 3 standard library on the server, plain JS in the browser. No depend
 
 ## Quick start
 
-Requirements: Python 3.9+, `adb` on the PATH, TVs with *Developer options → ADB debugging (network)* on.
+Requirements: Python 3.9+, `adb` on the PATH, `ffmpeg` (optional, only for the live screen view), TVs with *Developer options → ADB debugging (network)* on.
 
 ```bash
 git clone https://github.com/douggreenak/tv-adb-manager && cd tv-adb-manager

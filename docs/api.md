@@ -39,6 +39,13 @@ curl -b jar -H 'X-Requested-With: tvm' -H 'Content-Type: application/json' \
 
 `status` is one of `online`, `asleep`, `offline`, `unauthorized`, `unknown`.
 
+### Live screen view
+
+`GET /api/devices/<id>/live?quality=low|medium|high` returns a `multipart/x-mixed-replace` stream of JPEG frames (boundary
+`frame`, each part has `Content-Length`), so it also works in a plain `<img src>`. Only the newest frame is sent, so a slow
+client skips frames instead of lagging. Errors are normal JSON: `409` TV unreachable, `501` ffmpeg missing, `502` the TV
+produced no video (the TV's own message is included), `429` too many live views. Sessions end after 30 minutes.
+
 ### Actions
 
 `POST /api/devices/<id>/action` with `{action, ...}`:

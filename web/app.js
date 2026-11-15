@@ -61,6 +61,8 @@ const ICONS = {
   lock: "M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z",
   error: "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z",
   done: "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z",
+  fullscreen: "M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z",
+  camera: "M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z",
   terminal: "M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V8h16v10zm-2-1h-6v-2h6v2zM7.5 17l-1.41-1.41L8.67 13l-2.58-2.59L7.5 9l4 4-4 4z",
 };
 function ic(name) {
@@ -377,7 +379,7 @@ function addDeviceDialog() {
 }
 
 /* ---------- side sheet (drawer) ---------- */
-const TABS = [["remote", "Remote"], ["inputs", "Inputs"], ["apps", "Apps"], ["install", "Install"], ["shell", "Shell"], ["info", "Info"], ["settings", "Settings"]];
+const TABS = [["remote", "Remote"], ["screen", "Screen"], ["inputs", "Inputs"], ["apps", "Apps"], ["install", "Install"], ["shell", "Shell"], ["info", "Info"], ["settings", "Settings"]];
 let shotTimer = null;
 const cleanups = [];
 function runCleanups() { clearInterval(shotTimer); while (cleanups.length) cleanups.pop()(); }
@@ -416,11 +418,20 @@ function renderTabs() {
 function renderTab() {
   const d = byId(S.open); if (!d) return;
   const body = $("#dbody"); body.replaceChildren();
-  ({ remote: tabRemote, inputs: tabInputs, apps: tabApps, install: tabInstall, shell: tabShell, info: tabInfo, settings: tabSettings })[S.tab](body, d);
+  ({ remote: tabRemote, screen: tabScreen, inputs: tabInputs, apps: tabApps, install: tabInstall, shell: tabShell, info: tabInfo, settings: tabSettings })[S.tab](body, d);
 }
 
 async function sendKey(id, key) {
   try { const r = await act(id, "key", { key }); if (!r.ok) toast("Key failed: " + r.output, true); } catch (e) { toast(e.message, true); }
+}
+
+/* arrows / Enter / Backspace / H drive the TV while the switch is on; removed when the tab goes away */
+function keyboardControl(d, kb) {
+  const keymap = { ArrowUp: "KEYCODE_DPAD_UP", ArrowDown: "KEYCODE_DPAD_DOWN", ArrowLeft: "KEYCODE_DPAD_LEFT", ArrowRight: "KEYCODE_DPAD_RIGHT", Enter: "KEYCODE_DPAD_CENTER", Backspace: "KEYCODE_BACK", h: "KEYCODE_HOME" };
+  const onKey = e => { if (!kb.checked || !$("#drawer") || ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName) && document.activeElement !== kb) return;
+    if (keymap[e.key]) { e.preventDefault(); e.stopPropagation(); sendKey(d.id, keymap[e.key]); } };
+  document.addEventListener("keydown", onKey, true);
+  cleanups.push(() => document.removeEventListener("keydown", onKey, true));
 }
 
 function tabRemote(body, d) {
@@ -428,20 +439,8 @@ function tabRemote(body, d) {
   const k = (kids, key, label, cls) => h("button", { class: "btn" + (cls ? " " + cls : ""), title: key.replace("KEYCODE_", ""), "aria-label": label,
     onclick: () => sendKey(d.id, key) }, kids);
   const blank = () => h("span");
-  const img = h("img", { class: "shot hidden", alt: "Screenshot of " + d.name });
-  const load = async (quiet) => {
-    try {
-      const r = await fetch(`/api/devices/${d.id}/screenshot?t=${Date.now()}`, { credentials: "same-origin" });
-      if (!r.ok) throw new Error((await r.json()).error); img.src = URL.createObjectURL(await r.blob()); img.classList.remove("hidden");
-    } catch (e) { if (!quiet) toast(cap(e.message), true); }
-  };
   const kb = h("input", { type: "checkbox", class: "switch", role: "switch", id: "kbctl", "aria-label": "Use keyboard" });
-  const keymap = { ArrowUp: "KEYCODE_DPAD_UP", ArrowDown: "KEYCODE_DPAD_DOWN", ArrowLeft: "KEYCODE_DPAD_LEFT", ArrowRight: "KEYCODE_DPAD_RIGHT", Enter: "KEYCODE_DPAD_CENTER", Backspace: "KEYCODE_BACK", h: "KEYCODE_HOME" };
-  const onKey = e => { if (!kb.checked || !$("#drawer") || ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName) && document.activeElement !== kb) return;
-    if (keymap[e.key]) { e.preventDefault(); e.stopPropagation(); sendKey(d.id, keymap[e.key]); } };
-  document.addEventListener("keydown", onKey, true);
-  cleanups.push(() => document.removeEventListener("keydown", onKey, true));
-  if (d.status === "online") load(true);
+  keyboardControl(d, kb);
   const power = (label, action, msg, cls) => h("button", { class: "btn small" + (cls ? " " + cls : ""), onclick: async () => {
     if (action === "reboot" && !confirm("Reboot " + d.name + "?")) return;
     const r = await act(d.id, action); toast(r.ok ? msg : r.output, !r.ok); } }, ic("power"), label);
@@ -466,9 +465,94 @@ function tabRemote(body, d) {
       h("div", { class: "btn-group" }, power("Wake", "wake", "Wake sent"), power("Standby", "sleep", "Standby sent"), power("Reboot", "reboot", "Rebooting…", "danger")),
       h("label", { class: "row", for: "kbctl", style: "width:100%" }, h("span", { class: "grow" }, "Use keyboard",
         h("span", { class: "sub", style: "display:block" }, "Arrows, Enter, Backspace = Back, H = Home")), kb)),
-    h("div", { class: "shot-wrap" }, img,
-      h("div", { class: "keys", style: "margin-top:12px" }, h("button", { class: "btn small", onclick: () => load() }, "Screenshot"),
-        h("label", { class: "keys muted" }, h("input", { type: "checkbox", class: "switch", role: "switch", "aria-label": "Auto-refresh", onchange: e => { clearInterval(shotTimer); if (e.target.checked) { load(true); shotTimer = setInterval(() => load(true), 3000); } } }), "Auto-refresh"))))));
+    h("div", { class: "watch-card" }, h("div", { class: "empty-ic" }, ic("tv")), h("h3", null, "See the screen"),
+      h("p", { class: "muted" }, "Watch what this TV is showing, live, while you use the remote."),
+      h("button", { class: "btn primary", onclick: () => { S.tab = "screen"; runCleanups(); renderTabs(); renderTab(); } }, ic("play"), "Open screen view")))));
+}
+
+const QUALITY = [["low", "Low · 480p"], ["medium", "Medium · 720p"], ["high", "High · 1080p"]];
+const concatBytes = (a, b) => { if (!a.length) return b; const o = new Uint8Array(a.length + b.length); o.set(a); o.set(b, a.length); return o; };
+function findHeaderEnd(b, from) { for (let i = from; i + 3 < b.length; i++) if (b[i] === 13 && b[i + 1] === 10 && b[i + 2] === 13 && b[i + 3] === 10) return i; return -1; }
+
+/* Live view: the server sends multipart JPEG frames; we parse them here (rather than using <img>) so errors can be shown. */
+function tabScreen(body, d) {
+  if (!usable(d)) return body.append(unavailable(d, "The screen view"));
+  const img = h("img", { class: "live-img hidden", alt: "Live view of " + d.name });
+  const overlay = h("div", { class: "viewer-overlay" });
+  const badge = h("div", { class: "live-badge hidden" }, h("i"), h("span", null, "LIVE"));
+  const viewer = h("div", { class: "viewer" }, img, overlay, badge);
+  const quality = h("select", { "aria-label": "Quality", onchange: () => { prefs.set("tvm-quality", quality.value); if (ctrl) start(); } },
+    QUALITY.map(([v, l]) => h("option", { value: v, selected: v === prefs.get("tvm-quality", "medium") }, l)));
+  const toggle = h("button", { class: "btn primary", onclick: () => ctrl ? stop() : start() });
+  let ctrl = null, userStopped = false, frameUrl = null, count = 0;
+  const fpsTimer = setInterval(() => { if (ctrl) badge.lastChild.textContent = `LIVE · ${count} fps`; count = 0; }, 1000);
+  cleanups.push(() => { userStopped = true; if (ctrl) ctrl.abort(); ctrl = null; clearInterval(fpsTimer); if (frameUrl) URL.revokeObjectURL(frameUrl); });
+
+  function ui(state, text) {
+    overlay.classList.toggle("hidden", state === "live");
+    badge.classList.toggle("hidden", state !== "live");
+    toggle.replaceChildren(...(state === "live" ? [ic("close"), "Stop"] : state === "connecting" ? [ic("close"), "Cancel"] : [ic("play"), "Start live view"]));
+    if (state === "connecting") overlay.replaceChildren(h("div", { class: "spinner", role: "status", "aria-label": "Connecting" }), h("p", null, "Connecting to the TV…"));
+    else if (state === "error" || state === "ended") overlay.replaceChildren(h("div", { class: "empty-ic" }, ic(state === "error" ? "error" : "info")), h("p", { class: "viewer-msg" }, text),
+      /^No video/.test(text || "") ? h("p", { class: "viewer-sub" }, "Some TVs don't allow screen capture. It depends on the TV's firmware, and video from HDMI inputs is usually blocked.") : null,
+      h("button", { class: "btn", onclick: start }, ic("refresh"), state === "error" ? "Try again" : "Resume"));
+    else if (state === "idle") overlay.replaceChildren(h("button", { class: "big-play", "aria-label": "Start live view", onclick: start }, ic("play")),
+      h("p", { class: "viewer-msg" }, "Watch what this TV is showing"), h("p", { class: "viewer-sub" }, "Shows the TV's interface and apps. Video from an HDMI input is usually not capturable."));
+  }
+  function show(blob) {
+    const u = URL.createObjectURL(blob), old = frameUrl; frameUrl = u;
+    img.src = u; img.classList.remove("hidden"); count++;
+    if (old) setTimeout(() => URL.revokeObjectURL(old), 500);
+  }
+  function drain(buf) {                 // show the newest complete frame in the buffer; return the leftover bytes
+    let last = null, pos = 0;
+    for (;;) {
+      const he = findHeaderEnd(buf, pos); if (he < 0) break;
+      const m = /content-length:\s*(\d+)/i.exec(new TextDecoder().decode(buf.subarray(pos, he)));
+      if (!m) { pos = he + 4; continue; }
+      const n = +m[1], from = he + 4;
+      if (buf.length < from + n) break;
+      last = buf.subarray(from, from + n); pos = from + n;
+    }
+    if (last) show(new Blob([last], { type: "image/jpeg" }));
+    return pos ? buf.slice(pos) : buf;
+  }
+  async function start() {
+    if (ctrl) ctrl.abort();
+    userStopped = false; const mine = ctrl = new AbortController(); count = 0;
+    ui("connecting");
+    try {
+      const r = await fetch(`/api/devices/${d.id}/live?quality=${quality.value}`, { credentials: "same-origin", signal: mine.signal });
+      if (!r.ok) { let m = "HTTP " + r.status; try { m = (await r.json()).error || m; } catch (e) { /* not json */ } throw new Error(cap(m)); }
+      ui("live");
+      const reader = r.body.getReader(); let buf = new Uint8Array(0);
+      for (;;) { const { done, value } = await reader.read(); if (done) break; buf = drain(concatBytes(buf, value)); }
+      if (ctrl === mine && !userStopped) { ctrl = null; ui("ended", "The live view stopped. It ends by itself after 30 minutes."); }
+    } catch (e) {
+      if (mine.signal.aborted) return;
+      ctrl = null; ui("error", e.message === "Failed to fetch" ? "Lost the connection to the manager." : e.message);
+    }
+  }
+  function stop() { userStopped = true; if (ctrl) ctrl.abort(); ctrl = null; img.classList.add("hidden"); ui("idle"); }
+  const snapshot = () => {
+    if (!img.naturalWidth || img.classList.contains("hidden")) return toast("Start the live view first", true);
+    const c = document.createElement("canvas"); c.width = img.naturalWidth; c.height = img.naturalHeight; c.getContext("2d").drawImage(img, 0, 0);
+    c.toBlob(b => { const a = h("a", { href: URL.createObjectURL(b), download: `${d.name}-${new Date().toISOString().replace(/[:.]/g, "-")}.jpg` });
+      document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); }, "image/jpeg", 0.92);
+  };
+
+  const k = (kids, key, label, cls) => h("button", { class: "btn small" + (cls ? " " + cls : ""), title: key.replace("KEYCODE_", ""), "aria-label": label, onclick: () => sendKey(d.id, key) }, kids);
+  const kb = h("input", { type: "checkbox", class: "switch", role: "switch", id: "kbscreen", "aria-label": "Use keyboard" });
+  keyboardControl(d, kb);
+  ui("idle");
+  body.append(h("div", { class: "panel" }, viewer,
+    h("div", { class: "viewer-tools" }, toggle, selectField(quality, true),
+      h("button", { class: "icon-btn", "aria-label": "Save snapshot", title: "Save snapshot", onclick: snapshot }, ic("camera")),
+      h("button", { class: "icon-btn", "aria-label": "Fullscreen", title: "Fullscreen", onclick: () => viewer.requestFullscreen && viewer.requestFullscreen() }, ic("fullscreen"))),
+    h("div", { class: "mini-remote" },
+      h("div", { class: "btn-group" }, k([ic("back"), "Back"], "KEYCODE_BACK", "Back"), k(ic("left"), "KEYCODE_DPAD_LEFT", "Left"), k(ic("up"), "KEYCODE_DPAD_UP", "Up"),
+        k(ic("down"), "KEYCODE_DPAD_DOWN", "Down"), k(ic("right"), "KEYCODE_DPAD_RIGHT", "Right"), k("OK", "KEYCODE_DPAD_CENTER", "OK", "primary"), k([ic("home"), "Home"], "KEYCODE_HOME", "Home")),
+      h("label", { class: "row", for: "kbscreen" }, h("span", { class: "grow" }, "Use keyboard", h("span", { class: "sub", style: "display:block" }, "Arrows, Enter, Backspace = Back, H = Home")), kb))));
 }
 
 const STATE_CHIP = { connected: ["Device on", "ok"], standby: ["Device in standby", ""], disconnected: ["Nothing connected", ""], unknown: ["", ""] };

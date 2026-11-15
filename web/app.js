@@ -220,14 +220,11 @@ const signOut = async () => { await api("POST", "/api/logout"); showLogin(); };
 function renderShell() {
   const items = NAV.map(([v, label, icon]) => h("button", { class: "nav-item", "aria-current": String(S.view === v),
     onclick: () => { S.view = v; renderShell(); refresh(); } }, h("span", { class: "pill" }, ic(icon)), label));
-  const hubExtra = h("a", { class: "nav-item nav-extra appslink", href: hubUrl(), title: "Services hub — all apps" }, h("span", { class: "pill" }, ic("apps")), "Apps");
-  const outExtra = h("button", { class: "nav-item nav-extra", onclick: signOut }, h("span", { class: "pill" }, ic("logout")), "Sign out");
   $("#app").replaceChildren(h("div", { class: "shell" },
     h("header", { class: "topbar" }, h("div", { class: "title" }, "TV Manager"),
-      h("a", { class: "icon-btn appslink", href: hubUrl(), title: "Services hub — all apps", "aria-label": "Apps" }, ic("apps")),
+      h("a", { class: "apps-pill appslink", href: hubUrl(), title: "Services hub — all apps", "aria-label": "Apps" }, ic("apps"), h("span", { class: "lbl" }, "Apps")),
       h("button", { class: "icon-btn", onclick: signOut, "aria-label": "Sign out" }, ic("logout"))),
-    h("nav", { class: "nav", "aria-label": "Main" }, brandMark("TV Manager"), items,
-      h("div", { class: "nav-spacer" }), hubExtra, outExtra),
+    h("nav", { class: "nav", "aria-label": "Main" }, brandMark("TV Manager"), items),
     h("div", { class: "content" }, h("main", { class: "main", id: "main" }))));
   renderFab();
 }

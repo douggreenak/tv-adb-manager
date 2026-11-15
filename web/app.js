@@ -87,6 +87,8 @@ function renderShell() {
   $("#app").replaceChildren(
     h("header", { class: "topbar" },
       h("div", { class: "brand" }, "TV Manager"), h("nav", { class: "nav" }, nav),
+      h("a", { class: "btn small appslink", href: `http://${location.hostname}:8090/apps`, title: "Services hub \u2014 all apps" },
+        Object.assign(document.createElement("span"), { innerHTML: '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 4h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4zM4 10h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4zM4 16h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4z"/></svg>' }), "Apps"),
       h("button", { class: "btn small", onclick: async () => { await api("POST", "/api/logout"); showLogin(); } }, "Sign out")),
     h("main", { class: "main", id: "main" }));
 }

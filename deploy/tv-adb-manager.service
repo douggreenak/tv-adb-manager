@@ -7,12 +7,18 @@ Wants=network-online.target
 StartLimitIntervalSec=0
 
 [Service]
-Type=simple
+# The app tells systemd when it is ready and keeps pinging while healthy (poller ticking AND web server answering).
+# If it hangs or the pings stop for WatchdogSec, systemd kills and restarts it.
+Type=notify
+NotifyAccess=main
+WatchdogSec=60
+TimeoutStartSec=60
 # Edit these three for your machine. The user must have a home directory: ~/.android/adbkey is
 # the key the TVs authorize, so always run as the same user.
 User=tvmanager
 WorkingDirectory=/opt/tv-adb-manager
 Environment=HOME=/var/lib/tvmanager
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
 Environment=PYTHONUNBUFFERED=1
 # Optional: Environment=TVM_PORT=8420  TVM_HOST=0.0.0.0  TVM_PASSWORD=...
 ExecStart=/usr/bin/python3 -m tvmanager

@@ -157,6 +157,7 @@ class EventLog:
         self.items = deque(maxlen=maxlen)
         self.lock = threading.Lock()
         self.path = os.path.join(data_dir, "events.log") if data_dir else None
+        self.max_bytes = 2 * 1024 * 1024
 
     def add(self, device, msg, level="info"):
         ev = {"ts": time.time(), "device": device, "level": level, "msg": msg}
@@ -164,6 +165,8 @@ class EventLog:
             self.items.appendleft(ev)
             if self.path:
                 try:
+                    if os.path.exists(self.path) and os.path.getsize(self.path) > self.max_bytes:
+                        os.replace(self.path, self.path + ".1")                 # keep one previous file
                     with open(self.path, "a") as f:
                         f.write(json.dumps(ev) + "\n")
                 except OSError:

@@ -57,6 +57,7 @@ class Monitor:
         self.inflight = set()
         self._stop = threading.Event()
         self._thread = None
+        self.last_tick = None          # heartbeat for the service watchdog
 
     # ---- lifecycle -----------------------------------------------------
     def start(self):
@@ -72,6 +73,7 @@ class Monitor:
                 self.tick()
             except Exception as e:  # never let the loop die
                 self.events.add("-", "monitor error: %r" % e, "error")
+            self.last_tick = time.time()
             self._stop.wait(self.poll)
 
     def tick(self):

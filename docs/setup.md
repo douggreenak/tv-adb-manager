@@ -39,6 +39,20 @@ sudo systemctl enable --now tv-adb-manager
 journalctl -u tv-adb-manager -f
 ```
 
+### What the service does for you
+
+| Situation | What happens |
+|---|---|
+| The server boots | systemd starts it after the network is up (`enable` makes this permanent) |
+| The process crashes or is killed | restarted after 3 seconds, with no limit on how many times |
+| The process hangs (alive but frozen) | it stops sending health pings (a ping needs the poller ticking *and* the web server answering); systemd declares a watchdog timeout after 60 s, kills it and restarts it |
+| A TV goes offline | retried every 10 s, and its input is restored when it returns |
+| `adb` dies | its server is respawned on the next poll |
+| Weeks of uptime | the activity log rotates at 2 MB (one old file kept); devices, schedules and the password hash live in `data/` and survive restarts |
+
+It runs as a system service under systemd, so nothing depends on anyone being logged in. Check it with
+`systemctl status tv-adb-manager` (the *Status:* line shows the port it serves).
+
 The service user needs a home directory where `~/.android/adbkey` can live. TVs authorize that key,
 so run the manager as the same user every time, or you will be asked to approve again on every TV.
 

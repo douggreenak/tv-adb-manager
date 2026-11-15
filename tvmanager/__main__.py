@@ -3,6 +3,7 @@ import json
 import os
 import sys
 
+from . import sdnotify
 from .adb import Adb
 from .server import App, make_server
 
@@ -44,6 +45,8 @@ def main():
         return
     srv = make_server(app, args.host, args.port)
     print("TV ADB Manager listening on http://%s:%d" % (args.host, args.port), flush=True)
+    sdnotify.notify("READY=1\nSTATUS=serving on port %d" % args.port)       # Type=notify: started successfully
+    sdnotify.start_watchdog(app, args.host, args.port, log=lambda m: print(m, flush=True))
     try:
         srv.serve_forever()
     except KeyboardInterrupt:

@@ -14,6 +14,7 @@
 | Live view says *needs ffmpeg* | Install it on the server: `sudo apt install ffmpeg`. |
 | Screenshot fails (502) | Some TVs block `screencap`, and protected video renders black. Not fixable from the manager. |
 | Install fails with `INSTALL_FAILED_…` | The message is shown in the output box. Common: `VERSION_DOWNGRADE`, `INSUFFICIENT_STORAGE`, or an APK for another ABI. |
+| The service restarts every minute or so | The watchdog is firing: the poller or web server is wedged. Look for `watchdog: unhealthy` and `Watchdog timeout` in `journalctl -u tv-adb-manager`. A TV that makes `adb` hang can trigger it; remove that TV or fix its connection. |
 | Can't log in | The password is in `data/auth.json` as a hash. Start once with `TVM_PASSWORD=newpass` to reset it. |
 | Page loads but is blank | Check the browser console. A reverse proxy that rewrites paths or blocks `/app.js` is the usual cause. |
 

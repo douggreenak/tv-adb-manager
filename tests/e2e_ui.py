@@ -92,10 +92,48 @@ with sync_playwright() as p:
     # bulk: select all lobby-group, standby
     pg.click(".chip:has-text('Lobby')"); pg.click("text=Select all"); pg.click(".bulkbar >> text=Standby"); pg.wait_for_timeout(3500)
     pg.screenshot(path=OUT + "/f_bulk.png")
-    # schedule
-    pg.click("nav >> text=Schedules"); pg.click("#fab"); pg.fill("#sn1", "Morning on"); pg.fill("#st1", "07:30")
-    pg.click(".modal .chip:has-text('Lobby')"); pg.click(".modal >> text=Save"); pg.wait_for_selector(".sched:has-text('Morning on')")
+    # schedule calendar: drag on Wednesday 9:00-11:00, pick a TV, then move and resize the block
+    api = lambda path: pg.context.request.get("http://127.0.0.1:8431" + path).json()
+    wins = lambda: [x for x in api("/api/schedules")["schedules"] if x.get("kind") == "window"]
+    pg.click("nav >> text=Schedules"); pg.wait_for_selector(".cal-col"); assert_clean(pg, "Schedules")
+    pg.wait_for_selector(".cal-hint:has-text('Drag on a day')"); pg.wait_for_timeout(300)
+    def y_of(col, hour): return col.bounding_box()["y"] + hour * 44
+    wed = pg.locator(".cal-col[data-day='2']"); box = wed.bounding_box(); x = box["x"] + box["width"] / 2
+    pg.mouse.move(x, y_of(wed, 9)); pg.mouse.down(); pg.mouse.move(x, y_of(wed, 10), steps=6); pg.mouse.move(x, y_of(wed, 11), steps=6); pg.mouse.up()
+    pg.wait_for_selector(".modal"); assert pg.input_value("#ws") == "09:00" and pg.input_value("#we") == "11:00", (pg.input_value("#ws"), pg.input_value("#we"))
+    assert "Wed" in pg.inner_text(".chips.days .chip[aria-pressed='true']"), "dragged day should be preselected"
+    pg.click(".modal .chip:text-is('All TVs')"); pg.click(".modal .chip:has-text('Lobby')"); pg.fill("#wn", "Lobby hours")
+    assert "Lobby" in pg.inner_text(".cal-summary") and "9:00 AM" in pg.inner_text(".cal-summary") and "11:00 AM" in pg.inner_text(".cal-summary")
+    pg.screenshot(path=OUT + "/f_sched_dialog.png"); pg.click(".modal button:text-is('Save')"); pg.wait_for_selector(".cal-block")
+    w = wins(); assert len(w) == 1 and (w[0]["start"], w[0]["end"], w[0]["days"], w[0]["name"]) == ("09:00", "11:00", [2], "Lobby hours"), w
+    assert len(w[0]["targets"]) == 1
+    blk = pg.locator(".cal-block"); bb = blk.bounding_box()
+    pg.mouse.move(bb["x"] + bb["width"] / 2, bb["y"] + 40); pg.mouse.down()
+    pg.mouse.move(bb["x"] + bb["width"] / 2 + box["width"] / 2, bb["y"] + 60, steps=5); pg.mouse.move(bb["x"] + bb["width"] / 2 + box["width"], bb["y"] + 40 + 44, steps=5); pg.mouse.up()
+    pg.wait_for_timeout(800); w = wins(); assert (w[0]["start"], w[0]["end"], w[0]["days"]) == ("10:00", "12:00", [3]), w
+    bb = pg.locator(".cal-block").bounding_box(); hx = bb["x"] + bb["width"] / 2
+    pg.mouse.move(hx, bb["y"] + bb["height"] - 3); pg.mouse.down(); pg.mouse.move(hx, bb["y"] + bb["height"] + 20, steps=4); pg.mouse.move(hx, bb["y"] + bb["height"] - 3 + 44, steps=4); pg.mouse.up()
+    pg.wait_for_timeout(800); w = wins(); assert (w[0]["start"], w[0]["end"]) == ("10:00", "13:00"), w
     pg.screenshot(path=OUT + "/f_sched.png")
+    # a plain click on empty space makes a one-hour block; an overnight block spans two days
+    fri = pg.locator(".cal-col[data-day='4']"); fb = fri.bounding_box(); pg.mouse.click(fb["x"] + fb["width"] / 2, y_of(fri, 14) + 2)
+    pg.wait_for_selector(".modal"); assert (pg.input_value("#ws"), pg.input_value("#we")) == ("14:00", "15:00")
+    pg.fill("#ws", "22:00"); pg.fill("#we", "06:00"); assert "next day" in pg.inner_text(".cal-summary"); pg.click(".modal button:text-is('Save')")
+    for _ in range(40):
+        if pg.locator(".cal-block").count() == 3: break
+        pg.wait_for_timeout(250)
+    assert pg.locator(".cal-block").count() == 3, pg.locator(".cal-block").count()      # 1 + the two halves of the overnight block
+    assert_clean(pg, "Schedules with blocks")
+    # edit: pause, then delete both
+    pg.locator(".cal-block:has-text('Lobby hours')").click(); pg.wait_for_selector(".modal"); pg.click(".modal .switch"); pg.click(".modal button:text-is('Save')"); pg.wait_for_timeout(800)
+    assert wins()[0]["enabled"] is False and pg.locator(".cal-block.paused").count() == 1
+    pg.once("dialog", lambda d: d.accept()); pg.locator(".cal-block:has-text('Lobby hours')").click(); pg.click(".modal button:text-is('Delete')"); pg.wait_for_timeout(800)
+    pg.once("dialog", lambda d: d.accept()); pg.locator(".cal-block").first.click(); pg.click(".modal button:text-is('Delete')"); pg.wait_for_timeout(800)
+    assert wins() == [] and pg.locator(".cal-block").count() == 0
+    # phone width: the calendar fits without sideways scrolling
+    pg.set_viewport_size({"width": 390, "height": 800}); pg.wait_for_timeout(300)
+    assert pg.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1"), "calendar overflows on a phone"
+    pg.screenshot(path=OUT + "/f_sched_mobile.png"); pg.set_viewport_size({"width": 1280, "height": 860})
     # activity log
     pg.click("nav >> text=Activity"); pg.wait_for_selector(".ev:has-text('restored input')"); assert_clean(pg, "Activity"); pg.screenshot(path=OUT + "/f_activity.png")
     # change password + relogin

@@ -42,7 +42,8 @@ class App:
         self.events = EventLog(data_dir)
         self.auth = Auth(data_dir, env_password, log=lambda m: print(m, flush=True))
         self.monitor = Monitor(self.adb, self.store, self.events, poll=poll)
-        self.scheduler = Scheduler(self.store, self.events, self.run_action)
+        self.scheduler = Scheduler(self.store, self.events, self.run_action,
+                                   get_status=lambda dev: (self.monitor.snapshot(dev["id"]) or {}).get("status"))
         self.keepalive = KeepAlive(self.store, self.monitor, self.events)
         self.live = livemod.LiveManager()
         self.started = time.time()
@@ -571,7 +572,9 @@ def r_events(h, m, q):
 
 @route("GET", "/api/schedules")
 def r_schedules(h, m, q):
-    h._send(200, {"schedules": h.app.store.schedules()})
+    lt = time.localtime()
+    h._send(200, {"schedules": h.app.store.schedules(),
+                  "now": {"wday": lt.tm_wday, "time": time.strftime("%H:%M", lt), "zone": time.strftime("%Z", lt)}})
 
 
 @route("POST", "/api/schedules")

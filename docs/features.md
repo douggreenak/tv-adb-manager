@@ -113,14 +113,30 @@ that launcher (for example to remove ads), the feature goes with it. This manage
 Turn it off per TV on the **Inputs** tab. Events appear in **Activity** ("remembered input…",
 "restored input…", "not restoring input: TV is on …").
 
-## Schedules
+## Schedules (calendar)
 
-*Schedules → + New schedule*: pick an action (wake, standby, reboot, go Home, switch input), a time, days
-of the week and the target TVs. Times use the **server's** clock. Each schedule can be toggled on and off.
-A schedule fires at most once per minute even if the scheduler wakes twice.
+*Schedules* is a week calendar. A block means **these TVs are on from here to here**. You never choose how a
+TV is woken: the manager works that out.
 
-For *Switch input* schedules, pick the input by name from a list loaded from the first selected TV; the raw
-input id is filled in for you and can still be edited.
+- **Draw a block:** drag on a day (or click or tap for one hour). A dialog asks which TVs, which days it repeats
+  on (**Weekdays** / **Every day** shortcuts) and an optional name, and writes out what will happen
+  ("Lobby turns on at 9:00 AM and goes to standby at 11:00 AM, Mon–Fri.").
+- **Change a block:** drag it to move it (sideways changes the day), drag its top or bottom edge to resize it,
+  or click it to edit, pause (the *Enabled* switch) or delete it. A block that repeats shows on every day and
+  changes everywhere at once. Use the TV chips above the calendar to see one TV's schedule. An end earlier than the
+  start runs past midnight and is drawn on both days.
+- **At the start** each TV is brought up the way it needs: an asleep or screensaver TV gets a wake key over
+  ADB, a fully off TV gets Wake-on-LAN (if its MAC is known). It retries every 30 seconds for 15 minutes and
+  Activity says what happened. Once it is up, power-on restore puts it on its last input. A TV that is already on is left alone.
+- **At the end** each TV that is on goes to standby, unless another block covering the same TV is still running
+  (so back-to-back blocks don't blink the TV).
+- **Restarts and late edits:** a block that started in the last 10 minutes still counts after a server restart,
+  and a block you draw while its time is already running starts straight away. Older blocks aren't re-run.
+- Times use the **server's** clock; the page shows its zone and current time. Keyboard: Tab to a block, Enter to edit;
+  *New schedule* opens the same dialog without dragging.
+
+Schedules made before the calendar (a single timed action such as reboot or switch input) still run and appear
+under *Single timed actions*, where they can be paused or deleted.
 
 ## Activity
 

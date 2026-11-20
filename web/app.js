@@ -237,7 +237,7 @@ function renderShell() {
 /* one contextual extended FAB per page (icon-only on phones) */
 function renderFab() {
   $("#fab")?.remove();
-  const spec = { devices: ["Add device", addDeviceDialog], schedules: ["New schedule", () => scheduleDialog()] }[S.view];
+  const spec = { devices: ["Add device", addDeviceDialog], schedules: ["New schedule", () => windowDialog()] }[S.view];
   if (spec) $(".shell").append(h("button", { class: "fab", id: "fab", "aria-label": spec[0], onclick: spec[1] }, ic("add"), h("span", { class: "fab-label" }, spec[0])));
 }
 
@@ -766,72 +766,174 @@ function fmtTime(t) {
   return [full.replace(/\s?(AM|PM)$/i, ""), m ? m[1].toUpperCase() : ""];
 }
 
-async function renderSchedules() {
-  const main = $("#main"); if (!main || S.view !== "schedules") return;
-  const { schedules } = await api("GET", "/api/schedules");
-  const name = id => (byId(id) || { name: "(removed)" }).name;
-  const head = h("div", { class: "page-head" }, h("h1", null, "Schedules"), h("p", { class: "sub" }, "Run power and input actions at set times. Times use the server's clock."));
-  if (!schedules.length) {
-    main.replaceChildren(head, emptyState("schedule", "No schedules yet", "Wake the lobby TVs at 7:30, put everything on standby at night, or switch an input on weekends.",
-      h("button", { class: "btn primary", onclick: () => scheduleDialog() }, ic("add"), "New schedule")));
-    return;
+/* Calendar: a block means "these TVs are on from start to end". The server works out how to wake them. */
+const HOUR = 44, SNAP = 15;                                   // px per hour, minutes per snap step
+const mins = t => { const [x, y] = t.split(":").map(Number); return x * 60 + y; };
+const hmStr = m => { m = ((m % 1440) + 1440) % 1440; return String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0"); };
+const fmt12 = t => fmtTime(t).join(" ").trim();
+const winDur = w => (((mins(w.end) - mins(w.start)) % 1440) + 1440) % 1440 || 1440;
+const clampN = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const dayWords = ds => { const k = [...ds].sort().join(); return ds.length === 7 ? "every day" : k === "0,1,2,3,4" ? "weekdays" : k === "5,6" ? "weekends" : [...ds].sort().map(d => DAYS[d]).join(", "); };
+const blockHue = id => parseInt(id.slice(0, 4), 16) % 360;
+const tvName = id => (byId(id) || { name: "(removed)" }).name;
+
+function segments(w) {
+  const s0 = mins(w.start), e0 = s0 + winDur(w), out = [];
+  for (const d of w.days) {
+    if (e0 <= 1440) out.push({ day: d, from: s0, to: e0 });
+    else { out.push({ day: d, from: s0, to: 1440, over: "next" }, { day: (d + 1) % 7, from: 0, to: e0 - 1440, over: "prev" }); }
   }
-  main.replaceChildren(head, h("div", { class: "sched-list" }, schedules.map(s => {
-    const [t, ampm] = fmtTime(s.time), tg = s.targets.map(name);
+  return out;
+}
+
+async function saveWindow(w, patch) {
+  try { await api("PUT", "/api/schedules/" + w.id, { ...w, ...patch }); } catch (e) { toast(e.message, true); }
+  renderSchedules(true);
+}
+
+function calendar(windows, now) {
+  const filter = S.calFilter, shown = windows.filter(w => !filter || w.targets.includes(filter));
+  const cols = DAYS.map((_, d) => h("div", { class: "cal-col" + (d === now.wday ? " today" : ""), "data-day": String(d), "aria-label": DAYS[d] }));
+  let suppress = false;
+  const yMin = (col, ev) => clampN(Math.round(((ev.clientY - col.getBoundingClientRect().top) / HOUR * 60) / SNAP) * SNAP, 0, 1440);
+
+  cols.forEach((col, day) => {
+    // drag on empty space to draw a new block (mouse/pen); a tap or click makes a one-hour block
+    col.addEventListener("pointerdown", e => {
+      if (e.button !== 0 || e.pointerType === "touch" || e.target !== col) return;
+      const y0 = yMin(col, e), ghost = h("div", { class: "cal-ghost" }); let y1 = y0;
+      col.append(ghost); col.setPointerCapture(e.pointerId);
+      const draw = () => { const a = Math.min(y0, y1), b = Math.max(y0, y1);
+        ghost.style.top = a / 60 * HOUR + "px"; ghost.style.height = Math.max(b - a, SNAP) / 60 * HOUR + "px";
+        ghost.textContent = b - a >= SNAP ? `${fmt12(hmStr(a))} – ${fmt12(hmStr(b))}` : ""; };
+      draw();
+      const move = ev => { y1 = yMin(col, ev); draw(); };
+      const up = () => { col.removeEventListener("pointermove", move); col.removeEventListener("pointerup", up); col.removeEventListener("pointercancel", up); ghost.remove();
+        const a = Math.min(y0, y1), b = Math.max(y0, y1);
+        if (b - a >= SNAP) { suppress = true; setTimeout(() => { suppress = false; }, 50); windowDialog(null, { day, start: a, end: b }); } };
+      col.addEventListener("pointermove", move); col.addEventListener("pointerup", up); col.addEventListener("pointercancel", up);
+    });
+    col.addEventListener("click", e => { if (suppress || e.target !== col) return; const a = Math.min(yMin(col, e), 1440 - 60); windowDialog(null, { day, start: a, end: a + 60 }); });
+  });
+
+  for (const w of shown) for (const seg of segments(w)) {
+    const names = w.targets.map(tvName), label = w.name || names.join(", ");
+    const timeEl = h("div", { class: "cb-time" }), body = h("div", { class: "cb-body" });
+    const narrow = matchMedia("(max-width: 700px)").matches, tf = m => narrow ? fmtTime(hmStr(m))[0] : fmt12(hmStr(m));
+    const paint = (from, to) => { timeEl.textContent = `${tf(from)}–${tf(to)}`.replace("–", narrow ? "–" : " – "); };
+    paint(mins(w.start), mins(w.end));
+    body.append(h("div", { class: "cb-name" }, label), w.name ? h("div", { class: "cb-tvs" }, w.targets.length === 1 ? names[0] : w.targets.length + " TVs") : (w.targets.length > 1 ? h("div", { class: "cb-tvs" }, w.targets.length + " TVs") : null));
+    const el = h("div", { class: "cal-block" + (w.enabled ? "" : " paused") + (seg.over ? " over-" + seg.over : ""), role: "button", tabindex: "0", style: `--bh:${blockHue(w.id)};top:${seg.from / 60 * HOUR}px;height:${(seg.to - seg.from) / 60 * HOUR}px`,
+      "aria-label": `${label}: ${fmt12(w.start)} to ${fmt12(w.end)}, ${dayWords(w.days)}. ${names.join(", ")}${w.enabled ? "" : ". Paused"}`, title: `${label}\n${fmt12(w.start)} – ${fmt12(w.end)} · ${dayWords(w.days)}\n${names.join(", ")}` },
+      h("i", { class: "rs rs-top" }), timeEl, body, h("i", { class: "rs rs-bot" }));
+    let dragged = false;
+    el.addEventListener("click", e => { e.stopPropagation(); if (dragged) { dragged = false; return; } windowDialog(w); });
+    el.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); windowDialog(w); } });
+    if (!seg.over) el.addEventListener("pointerdown", e => {
+      if (e.button !== 0 || e.pointerType === "touch") return;
+      const mode = e.target.classList.contains("rs-top") ? "top" : e.target.classList.contains("rs-bot") ? "bot" : "move";
+      const x0 = e.clientX, y0 = e.clientY, colW = cols[0].getBoundingClientRect().width; let dm = 0, dd = 0, moved = false;
+      el.setPointerCapture(e.pointerId);
+      const move = ev => {
+        const dy = ev.clientY - y0, dx = ev.clientX - x0;
+        if (!moved && Math.abs(dy) < 4 && Math.abs(dx) < 4) return;
+        moved = true; el.classList.add("dragging");
+        dm = Math.round(dy / HOUR * 60 / SNAP) * SNAP;
+        let from = seg.from, to = seg.to;
+        if (mode === "move") { dm = clampN(dm, -from, 1440 - to); from += dm; to += dm; dd = clampN(Math.round(dx / colW), -seg.day, 6 - seg.day); }
+        else if (mode === "top") { dm = clampN(dm, -from, to - from - SNAP); from += dm; }
+        else { dm = clampN(dm, SNAP - (to - from), 1440 - to); to += dm; }
+        el.style.top = from / 60 * HOUR + "px"; el.style.height = (to - from) / 60 * HOUR + "px"; el.style.transform = `translateX(${dd * colW}px)`; paint(from, to);
+      };
+      const up = () => { el.removeEventListener("pointermove", move); el.removeEventListener("pointerup", up); el.removeEventListener("pointercancel", up);
+        if (!moved) return; dragged = true; setTimeout(() => { dragged = false; }, 50);
+        if (!dm && !dd) return renderSchedules(true);
+        saveWindow(w, { start: hmStr(mins(w.start) + (mode === "bot" ? 0 : dm)), end: hmStr(mins(w.end) + (mode === "top" ? 0 : dm)), days: mode === "move" ? w.days.map(d => (d + dd + 7) % 7) : w.days }); };
+      el.addEventListener("pointermove", move); el.addEventListener("pointerup", up); el.addEventListener("pointercancel", up);
+    });
+    cols[seg.day].append(el);
+  }
+
+  const nowLine = h("div", { class: "cal-now", "aria-hidden": "true" });
+  const place = () => { const d = new Date(); nowLine.style.top = (d.getHours() * 60 + d.getMinutes()) / 60 * HOUR + "px"; if (!document.contains(nowLine)) clearInterval(S.calTimer); };
+  cols[now.wday].append(nowLine); place(); clearInterval(S.calTimer); S.calTimer = setInterval(place, 60000);
+
+  const gutter = h("div", { class: "cal-gutter", "aria-hidden": "true" }, Array.from({ length: 24 }, (_, i) =>
+    h("div", { class: "cal-hour", style: `top:${i * HOUR}px` }, i === 0 ? "" : fmt12(hmStr(i * 60)).replace(":00", ""))));
+  const head = h("div", { class: "cal-head" }, h("div", { class: "cal-corner" }), DAYS.map((l, d) => h("div", { class: "cal-day" + (d === now.wday ? " today" : "") }, h("span", { class: "full" }, l), h("span", { class: "short" }, l.charAt(0)))));
+  const scroller = h("div", { class: "cal-scroll" }, head, h("div", { class: "cal-body", style: `height:${24 * HOUR}px` }, gutter, cols));
+  requestAnimationFrame(() => { scroller.scrollTop = Math.max(0, (shown.length ? Math.min(...shown.map(w => mins(w.start))) : 7 * 60) / 60 * HOUR - HOUR); });
+  return h("div", { class: "cal" + (shown.length ? "" : " cal-none") }, scroller,
+    shown.length ? null : h("div", { class: "cal-hint" }, ic("schedule"), h("div", null, h("b", null, windows.length ? "No schedules for this TV" : "Drag on a day to add a schedule"),
+      h("span", null, "Pick the time the TVs should be on, then choose which TVs. They turn on at the start and go to standby at the end."))));
+}
+
+async function renderSchedules(keepScroll) {
+  const main = $("#main"); if (!main || S.view !== "schedules") return;
+  const keep = keepScroll ? $(".cal-scroll")?.scrollTop : null;
+  const { schedules, now } = await api("GET", "/api/schedules");
+  const windows = schedules.filter(s => s.kind === "window"), legacy = schedules.filter(s => s.kind !== "window");
+  const head = h("div", { class: "page-head" }, h("h1", null, "Schedules"),
+    h("p", { class: "sub" }, `Drag on the calendar to choose when TVs should be on. At the start each TV turns on, however it needs to; at the end it goes to standby. Times are the server's clock (${now.zone || "local"}, now ${fmt12(now.time)}).`));
+  const filt = h("div", { class: "chips cal-filter", role: "group", "aria-label": "Show schedules for" },
+    h("button", { type: "button", class: "chip", "aria-pressed": String(!S.calFilter), onclick: () => { S.calFilter = ""; renderSchedules(true); } }, "All TVs"),
+    S.devices.map(d => h("button", { type: "button", class: "chip", "aria-pressed": String(S.calFilter === d.id), onclick: () => { S.calFilter = S.calFilter === d.id ? "" : d.id; renderSchedules(true); } }, d.name)));
+  const parts = [head, S.devices.length ? filt : null, calendar(windows, now)];
+  if (legacy.length) parts.push(h("h3", { class: "cal-sub" }, "Single timed actions"), h("div", { class: "sched-list" }, legacy.map(s => {
+    const [t, ampm] = fmtTime(s.time), tg = s.targets.map(tvName);
     return h("div", { class: "sched" + (s.enabled ? "" : " paused") },
       h("div", { class: "sched-time" }, t, ampm ? h("small", null, ampm) : null),
       h("div", { class: "sched-body" }, h("div", { class: "sched-name" }, s.name, s.enabled ? null : h("span", { class: "chip-s", style: "margin-left:8px" }, "Paused")),
-        h("div", { class: "sched-what" }, h("span", { class: "chip-s pri" }, ACTION_LABEL[s.action] + (s.input ? " → " + s.input.split("/").pop() : "")),
-          ...tg.slice(0, 4).map(n => h("span", { class: "chip-s" }, n)), tg.length > 4 ? h("span", { class: "chip-s" }, "+" + (tg.length - 4)) : null),
-        h("div", { class: "daydots", role: "img", "aria-label": s.days.length === 7 ? "Every day" : s.days.map(d => DAYS[d]).join(", ") },
-          DAYS.map((l, i) => h("span", { class: s.days.includes(i) ? "on" : "" }, l.charAt(0))))),
+        h("div", { class: "sched-what" }, h("span", { class: "chip-s pri" }, ACTION_LABEL[s.action] + (s.input ? " → " + s.input.split("/").pop() : "")), ...tg.map(n => h("span", { class: "chip-s" }, n))),
+        h("div", { class: "daydots", role: "img", "aria-label": dayWords(s.days) }, DAYS.map((l, i) => h("span", { class: s.days.includes(i) ? "on" : "" }, l.charAt(0))))),
       h("div", { class: "sched-ctl" },
-        h("input", { type: "checkbox", class: "switch", role: "switch", checked: s.enabled, "aria-label": "Enabled", onchange: async e => { await api("PUT", "/api/schedules/" + s.id, { ...s, enabled: e.target.checked }); renderSchedules(); } }),
-        h("button", { class: "icon-btn small", "aria-label": "Edit " + s.name, title: "Edit", onclick: () => scheduleDialog(s) }, ic("edit")),
-        h("button", { class: "icon-btn small danger", "aria-label": "Delete " + s.name, title: "Delete", onclick: async () => { if (confirm("Delete schedule " + s.name + "?")) { await api("DELETE", "/api/schedules/" + s.id); renderSchedules(); } } }, ic("delete"))));
+        h("input", { type: "checkbox", class: "switch", role: "switch", checked: s.enabled, "aria-label": "Enabled", onchange: async e => { await api("PUT", "/api/schedules/" + s.id, { ...s, enabled: e.target.checked }); renderSchedules(true); } }),
+        h("button", { class: "icon-btn small danger", "aria-label": "Delete " + s.name, title: "Delete", onclick: async () => { if (confirm("Delete schedule " + s.name + "?")) { await api("DELETE", "/api/schedules/" + s.id); renderSchedules(true); } } }, ic("delete"))));
   })));
+  main.replaceChildren(...parts);
+  if (keep != null) { const sc = $(".cal-scroll"); if (sc) sc.scrollTop = keep; }
 }
 
-function scheduleDialog(s) {
-  s = s || { name: "", action: "wake", time: "07:00", days: [0, 1, 2, 3, 4, 5, 6], targets: [], input: "", enabled: true };
-  const name = h("input", { type: "text", id: "sn1", value: s.name, placeholder: "Morning on", autocomplete: "off" });
-  const action = h("select", { id: "sa1", onchange: () => { inputField.classList.toggle("hidden", action.value !== "input"); if (action.value === "input") loadInputs(); } },
-    ...Object.entries(ACTION_LABEL).map(([v, l]) => h("option", { value: v, selected: v === s.action }, l)));
-  const time = h("input", { type: "time", id: "st1", value: s.time });
-  const inp = h("input", { type: "text", id: "si1", value: s.input || "", placeholder: "Pick an input above, or paste a full input id", class: "mono" });
-  const inputPick = h("select", { id: "si0", "aria-label": "Input", onchange: () => { if (inputPick.value) inp.value = inputPick.value; } }, h("option", { value: "" }, "Choose an input…"));
-  const days = new Set(s.days), targets = new Set(s.targets);
-  const allOn = () => S.devices.length > 0 && S.devices.every(x => targets.has(x.id));
-  const toggleChip = (set, key) => e => { set.has(key) ? set.delete(key) : set.add(key); e.currentTarget.setAttribute("aria-pressed", String(set.has(key)));
-    if (set === targets) { allChip.setAttribute("aria-pressed", String(allOn())); if (action.value === "input") loadInputs(); } };
-  const dayChips = h("div", { class: "chips days" }, DAYS.map((l, i) => h("button", { type: "button", class: "chip", "aria-pressed": String(days.has(i)), onclick: toggleChip(days, i) }, l)));
-  const devBtns = S.devices.map(d => h("button", { type: "button", class: "chip", "aria-pressed": String(targets.has(d.id)), onclick: toggleChip(targets, d.id) }, d.name));
-  const allChip = h("button", { type: "button", class: "chip", "aria-pressed": String(allOn()),
-    onclick: e => { const all = allOn(); S.devices.forEach(x => all ? targets.delete(x.id) : targets.add(x.id));
-      devBtns.forEach((b, i) => b.setAttribute("aria-pressed", String(targets.has(S.devices[i].id)))); e.currentTarget.setAttribute("aria-pressed", String(!all)); if (action.value === "input") loadInputs(); } }, "All");
-  const devChips = h("div", { class: "chips" }, allChip, devBtns);
+function windowDialog(w, pre) {
+  pre = pre || {};
+  const edit = !!(w && w.id);
+  w = w || { name: "", start: hmStr(pre.start ?? 8 * 60), end: hmStr(pre.end ?? 17 * 60), days: [pre.day ?? (new Date().getDay() + 6) % 7],
+    targets: S.calFilter ? [S.calFilter] : S.devices.map(d => d.id), enabled: true };
+  const name = h("input", { type: "text", id: "wn", value: w.name, placeholder: "Optional, e.g. Lobby open hours", autocomplete: "off" });
+  const start = h("input", { type: "time", id: "ws", value: w.start }), end = h("input", { type: "time", id: "we", value: w.end });
+  const days = new Set(w.days), targets = new Set(w.targets);
+  const summary = h("p", { class: "cal-summary", "aria-live": "polite" });
+  const update = () => {
+    const tv = [...targets].map(tvName);
+    summary.textContent = !start.value || !end.value || start.value === end.value ? "Choose a start and end time."
+      : !days.size ? "Choose at least one day." : !tv.length ? "Choose at least one TV."
+      : `${tv.length > 2 ? tv.length + " TVs turn" : tv.join(" and ") + (tv.length === 1 ? " turns" : " turn")} on at ${fmt12(start.value)} and ${tv.length === 1 ? "goes" : "go"} to standby at ${fmt12(end.value)}${end.value <= start.value ? " the next day" : ""}, ${dayWords([...days])}.`;
+  };
+  const chip = (set, key, label, after) => h("button", { type: "button", class: "chip", "aria-pressed": String(set.has(key)), onclick: e => { set.has(key) ? set.delete(key) : set.add(key); e.currentTarget.setAttribute("aria-pressed", String(set.has(key))); after && after(); update(); } }, label);
+  const dayChips = h("div", { class: "chips days" }, DAYS.map((l, i) => chip(days, i, l)));
+  const setDays = list => { days.clear(); list.forEach(d => days.add(d)); [...dayChips.children].forEach((c, i) => c.setAttribute("aria-pressed", String(days.has(i)))); update(); };
+  const devBtns = S.devices.map(d => chip(targets, d.id, d.name, () => allChip.setAttribute("aria-pressed", String(S.devices.every(x => targets.has(x.id))))));
+  const allChip = h("button", { type: "button", class: "chip", "aria-pressed": String(S.devices.length > 0 && S.devices.every(x => targets.has(x.id))),
+    onclick: e => { const all = S.devices.every(x => targets.has(x.id)); S.devices.forEach(x => all ? targets.delete(x.id) : targets.add(x.id));
+      devBtns.forEach((b, i) => b.setAttribute("aria-pressed", String(targets.has(S.devices[i].id)))); e.currentTarget.setAttribute("aria-pressed", String(!all)); update(); } }, "All TVs");
+  [start, end].forEach(i => i.addEventListener("input", update));
   const err = h("p", { class: "err", role: "alert" });
-  const inputField = h("div", { class: "field" + (s.action === "input" ? "" : " hidden") }, h("label", { for: "si0" }, "Input"), selectField(inputPick), h("span", { class: "hint" }, "Choices come from the first selected TV."),
-    h("label", { for: "si1", style: "margin-top:8px" }, "Input id"), inp);
-  async function loadInputs() {
-    const first = [...targets][0]; if (!first) return;
-    try {
-      const { inputs } = await api("GET", `/api/devices/${first}/inputs`);
-      inputPick.replaceChildren(h("option", { value: "" }, "Choose an input…"), ...inputs.filter(i => i.passthrough).map(i => h("option", { value: i.id, selected: i.id === inp.value }, i.name)));
-    } catch (e) { /* TV offline: the manual id field still works */ }
-  }
-  if (s.action === "input") loadInputs();
-  const m = modal(s.id ? "Edit schedule" : "New schedule", [
-    h("div", { class: "field" }, h("label", { for: "sn1" }, "Name"), name),
-    h("div", { class: "grid2" }, h("div", { class: "field" }, h("label", { for: "sa1" }, "Action"), selectField(action)),
-      h("div", { class: "field" }, h("label", { for: "st1" }, "Time"), time)),
-    inputField,
-    h("div", { class: "field" }, h("label", null, "Days"), dayChips),
-    h("div", { class: "field" }, h("label", null, "Devices"), devChips), err], [
+  const enabled = h("input", { type: "checkbox", class: "switch", role: "switch", checked: w.enabled, "aria-label": "Enabled" });
+  update();
+  const m = modal(edit ? "Edit schedule" : "New schedule", [
+    h("div", { class: "field" }, h("label", { for: "wn" }, "Name"), name),
+    h("div", { class: "grid2" }, h("div", { class: "field" }, h("label", { for: "ws" }, "On at"), start), h("div", { class: "field" }, h("label", { for: "we" }, "Standby at"), end)),
+    h("span", { class: "hint", style: "display:block;margin:-6px 0 14px" }, "If standby is earlier than on, it runs past midnight."),
+    h("div", { class: "field" }, h("label", null, "Repeat on", h("span", { class: "quick" },
+      h("button", { type: "button", class: "btn text small", onclick: () => setDays([0, 1, 2, 3, 4]) }, "Weekdays"), h("button", { type: "button", class: "btn text small", onclick: () => setDays([0, 1, 2, 3, 4, 5, 6]) }, "Every day"))), dayChips),
+    h("div", { class: "field" }, h("label", null, "Which TVs"), h("div", { class: "chips" }, allChip, devBtns)),
+    summary,
+    edit ? h("label", { class: "row", style: "margin:6px 0" }, h("span", { class: "grow" }, "Enabled", h("span", { class: "sub", style: "display:block" }, "Turn off to pause without deleting.")), enabled) : null, err], [
+    edit ? h("button", { class: "btn text danger", style: "margin-right:auto", onclick: async () => { if (confirm("Delete this schedule?")) { await api("DELETE", "/api/schedules/" + w.id); m.close(); renderSchedules(true); } } }, "Delete") : null,
     h("button", { class: "btn text", onclick: () => m.close() }, "Cancel"),
     h("button", { class: "btn primary", onclick: async () => {
-      const body = { name: name.value, action: action.value, time: time.value, days: [...days], targets: [...targets], input: inp.value || null, enabled: s.enabled };
-      try { await api(s.id ? "PUT" : "POST", "/api/schedules" + (s.id ? "/" + s.id : ""), body); m.close(); renderSchedules(); } catch (e) { err.textContent = e.message; } } }, "Save")]);
+      const body = { kind: "window", name: name.value, start: start.value, end: end.value, days: [...days], targets: [...targets], enabled: edit ? enabled.checked : true };
+      try { await api(edit ? "PUT" : "POST", "/api/schedules" + (edit ? "/" + w.id : ""), body); m.close(); renderSchedules(true); } catch (e) { err.textContent = e.message; } } }, "Save")]);
 }
 
 /* ---------- activity & settings ---------- */

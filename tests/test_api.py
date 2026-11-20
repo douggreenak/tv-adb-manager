@@ -112,6 +112,21 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(s["time"], "07:05")
         self.assertEqual(self.req("DELETE", "/api/schedules/%s" % s["id"], cookie=c)[0], 200)
 
+    def test_window_schedule_api(self):
+        c = self.login()
+        did = json.loads(self.req("POST", "/api/devices", {"name": "W", "addr": "10.5.5.5"}, c)[1])["id"]
+        body = {"kind": "window", "start": "07:30", "end": "17:00", "days": [0, 1, 2, 3, 4], "targets": [did], "name": "Open"}
+        st, resp, _ = self.req("POST", "/api/schedules", body, c)
+        self.assertEqual(st, 201)
+        w = json.loads(resp)
+        self.assertEqual((w["kind"], w["start"], w["end"]), ("window", "07:30", "17:00"))
+        self.assertEqual(self.req("POST", "/api/schedules", dict(body, end="07:30"), c)[0], 400)      # zero length
+        self.assertEqual(self.req("PUT", "/api/schedules/%s" % w["id"], dict(body, start="08:00", end="02:00"), c)[0], 200)   # overnight is fine
+        got = json.loads(self.req("GET", "/api/schedules", cookie=c)[1])
+        self.assertEqual(got["schedules"][0]["start"], "08:00")
+        self.assertIn("time", got["now"])
+        self.assertIn(got["now"]["wday"], range(7))
+
     def test_static_and_traversal(self):
         self.assertEqual(self.req("GET", "/")[0], 200)
         self.assertEqual(self.req("GET", "/..%2f..%2fetc/passwd")[0], 404)

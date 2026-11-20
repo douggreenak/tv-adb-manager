@@ -70,7 +70,7 @@ produced no video (the TV's own message is included), `429` too many live views.
 
 | Method & path | Body |
 |---|---|
-| `GET /api/schedules` | |
-| `POST /api/schedules`, `PUT /api/schedules/<id>` | `{name, action: wake\|sleep\|reboot\|home\|input, time:"HH:MM", days:[0-6 Mon-Sun], targets:[deviceIds], input, enabled}` |
+| `GET /api/schedules` | | `{schedules:[…], now:{wday, time, zone}}` (server clock) |
+| `POST /api/schedules`, `PUT /api/schedules/<id>` | **Window (calendar block):** `{kind:"window", name, start:"HH:MM", end:"HH:MM" (earlier than start = next day), days:[0-6 Mon-Sun], targets:[deviceIds], enabled}`. **Single action:**  `{name, action: wake\|sleep\|reboot\|home\|input, time:"HH:MM", days:[0-6 Mon-Sun], targets:[deviceIds], input, enabled}` |
 | `DELETE /api/schedules/<id>` | |
 | `GET /api/events` | returns the last 300 events, newest first |

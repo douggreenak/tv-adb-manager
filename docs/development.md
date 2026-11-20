@@ -3,6 +3,7 @@
 ```bash
 python3 -m unittest discover -s . -p "test_*.py" -t .     # 28 tests, about 5 s, no hardware
 python3 tests/e2e_ui.py                                    # browser test; pip install playwright
+- `python tests/e2e_calendar.py` drives the schedule calendar in Chromium: drawing (including upward drags and tiny drags), validation, overlapping blocks, moving and resizing with clamping, 15-minute blocks, filters, overnight blocks, pausing, scroll position, keyboard, reload, dark theme and phone width.
 ```
 
 Service tests (`tests/test_service.py`) cover the systemd notification, the watchdog health check and log rotation.

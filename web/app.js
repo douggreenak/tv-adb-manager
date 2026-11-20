@@ -791,7 +791,7 @@ async function saveWindow(w, patch) {
   renderSchedules(true);
 }
 
-function calendar(windows, now) {
+function calendar(windows, now, autoScroll) {
   const filter = S.calFilter, shown = windows.filter(w => !filter || w.targets.includes(filter));
   const cols = DAYS.map((_, d) => h("div", { class: "cal-col" + (d === now.wday ? " today" : ""), "data-day": String(d), "aria-label": DAYS[d] }));
   let suppress = false;
@@ -816,14 +816,28 @@ function calendar(windows, now) {
     col.addEventListener("click", e => { if (suppress || e.target !== col) return; const a = Math.min(yMin(col, e), 1440 - 60); windowDialog(null, { day, start: a, end: a + 60 }); });
   });
 
-  for (const w of shown) for (const seg of segments(w)) {
+  // overlapping blocks in a day sit side by side instead of on top of each other
+  const segs = shown.flatMap(w => segments(w).map(seg => ({ w, seg })));
+  for (let d = 0; d < 7; d++) {
+    const day = segs.filter(x => x.seg.day === d).sort((a, b) => a.seg.from - b.seg.from || b.seg.to - a.seg.to);
+    let cluster = [], end = 0;
+    const flush = () => { const n = Math.max(1, ...cluster.map(x => x.lane + 1)); cluster.forEach(x => { x.lanes = n; }); cluster = []; };
+    for (const x of day) {
+      if (cluster.length && x.seg.from >= end) { flush(); end = 0; }
+      const used = new Set(cluster.filter(c => c.seg.to > x.seg.from).map(c => c.lane));
+      x.lane = 0; while (used.has(x.lane)) x.lane++;
+      cluster.push(x); end = Math.max(end, x.seg.to);
+    }
+    if (cluster.length) flush();
+  }
+  for (const { w, seg, lane, lanes } of segs) {
     const names = w.targets.map(tvName), label = w.name || names.join(", ");
     const timeEl = h("div", { class: "cb-time" }), body = h("div", { class: "cb-body" });
     const narrow = matchMedia("(max-width: 700px)").matches, tf = m => narrow ? fmtTime(hmStr(m))[0] : fmt12(hmStr(m));
     const paint = (from, to) => { timeEl.textContent = `${tf(from)}–${tf(to)}`.replace("–", narrow ? "–" : " – "); };
     paint(mins(w.start), mins(w.end));
     body.append(h("div", { class: "cb-name" }, label), w.name ? h("div", { class: "cb-tvs" }, w.targets.length === 1 ? names[0] : w.targets.length + " TVs") : (w.targets.length > 1 ? h("div", { class: "cb-tvs" }, w.targets.length + " TVs") : null));
-    const el = h("div", { class: "cal-block" + (w.enabled ? "" : " paused") + (seg.over ? " over-" + seg.over : ""), role: "button", tabindex: "0", style: `--bh:${blockHue(w.id)};top:${seg.from / 60 * HOUR}px;height:${(seg.to - seg.from) / 60 * HOUR}px`,
+    const el = h("div", { class: "cal-block" + ((seg.to - seg.from) * HOUR / 60 < 30 ? " short" : "") + (w.enabled ? "" : " paused") + (seg.over ? " over-" + seg.over : ""), role: "button", tabindex: "0", style: `--bh:${blockHue(w.id)};top:${seg.from / 60 * HOUR}px;height:${(seg.to - seg.from) / 60 * HOUR}px;left:calc(${lane / lanes * 100}% + 3px);right:calc(${(lanes - lane - 1) / lanes * 100}% + 3px)`,
       "aria-label": `${label}: ${fmt12(w.start)} to ${fmt12(w.end)}, ${dayWords(w.days)}. ${names.join(", ")}${w.enabled ? "" : ". Paused"}`, title: `${label}\n${fmt12(w.start)} – ${fmt12(w.end)} · ${dayWords(w.days)}\n${names.join(", ")}` },
       h("i", { class: "rs rs-top" }), timeEl, body, h("i", { class: "rs rs-bot" }));
     let dragged = false;
@@ -855,14 +869,15 @@ function calendar(windows, now) {
   }
 
   const nowLine = h("div", { class: "cal-now", "aria-hidden": "true" });
-  const place = () => { const d = new Date(); nowLine.style.top = (d.getHours() * 60 + d.getMinutes()) / 60 * HOUR + "px"; if (!document.contains(nowLine)) clearInterval(S.calTimer); };
+  const t0 = Date.now(), base = mins(now.time);                                  // the server's clock, advanced locally
+  const place = () => { const m = (base + (Date.now() - t0) / 60000) % 1440; nowLine.style.top = m / 60 * HOUR + "px"; if (!document.contains(nowLine)) clearInterval(S.calTimer); };
   cols[now.wday].append(nowLine); place(); clearInterval(S.calTimer); S.calTimer = setInterval(place, 60000);
 
   const gutter = h("div", { class: "cal-gutter", "aria-hidden": "true" }, Array.from({ length: 24 }, (_, i) =>
     h("div", { class: "cal-hour", style: `top:${i * HOUR}px` }, i === 0 ? "" : fmt12(hmStr(i * 60)).replace(":00", ""))));
   const head = h("div", { class: "cal-head" }, h("div", { class: "cal-corner" }), DAYS.map((l, d) => h("div", { class: "cal-day" + (d === now.wday ? " today" : "") }, h("span", { class: "full" }, l), h("span", { class: "short" }, l.charAt(0)))));
   const scroller = h("div", { class: "cal-scroll" }, head, h("div", { class: "cal-body", style: `height:${24 * HOUR}px` }, gutter, cols));
-  requestAnimationFrame(() => { scroller.scrollTop = Math.max(0, (shown.length ? Math.min(...shown.map(w => mins(w.start))) : 7 * 60) / 60 * HOUR - HOUR); });
+  if (autoScroll) requestAnimationFrame(() => { scroller.scrollTop = Math.max(0, (shown.length ? Math.min(...shown.map(w => mins(w.start))) : 7 * 60) / 60 * HOUR - HOUR); });
   return h("div", { class: "cal" + (shown.length ? "" : " cal-none") }, scroller,
     shown.length ? null : h("div", { class: "cal-hint" }, ic("schedule"), h("div", null, h("b", null, windows.length ? "No schedules for this TV" : "Drag on a day to add a schedule"),
       h("span", null, "Pick the time the TVs should be on, then choose which TVs. They turn on at the start and go to standby at the end."))));
@@ -878,7 +893,7 @@ async function renderSchedules(keepScroll) {
   const filt = h("div", { class: "chips cal-filter", role: "group", "aria-label": "Show schedules for" },
     h("button", { type: "button", class: "chip", "aria-pressed": String(!S.calFilter), onclick: () => { S.calFilter = ""; renderSchedules(true); } }, "All TVs"),
     S.devices.map(d => h("button", { type: "button", class: "chip", "aria-pressed": String(S.calFilter === d.id), onclick: () => { S.calFilter = S.calFilter === d.id ? "" : d.id; renderSchedules(true); } }, d.name)));
-  const parts = [head, S.devices.length ? filt : null, calendar(windows, now)];
+  const parts = [head, S.devices.length ? filt : null, calendar(windows, now, !keepScroll)];
   if (legacy.length) parts.push(h("h3", { class: "cal-sub" }, "Single timed actions"), h("div", { class: "sched-list" }, legacy.map(s => {
     const [t, ampm] = fmtTime(s.time), tg = s.targets.map(tvName);
     return h("div", { class: "sched" + (s.enabled ? "" : " paused") },

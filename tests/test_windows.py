@@ -142,6 +142,48 @@ class EngineTests(unittest.TestCase):
         self.sched.tick(lt(MON, 12, 0))
         self.assertTrue(self.calls)
 
+    def test_repeats_every_week(self):
+        """A Mon-Fri 07:00-17:00 block fires on the weekdays of every week, never on weekends, and doesn't double up."""
+        self.add()
+        starts, ends = [], []
+        orig = self.sched.run_action
+        def spy(dev, action, args):
+            (starts if action == "wake" else ends).append(time.strftime("%a %m-%d %H:%M", time.localtime(self.now)))
+            return orig(dev, action, args)
+        self.sched.run_action = spy
+        self.status[self.a["id"]] = "asleep"
+        for week in range(4):
+            for day in range(7):
+                self.status[self.a["id"]] = "asleep"
+                self.now = time.mktime(lt(week * 7 + day, 7, 0))
+                self.sched.tick(time.localtime(self.now), self.now)
+                self.sched.tick(time.localtime(self.now + 20), self.now + 20)      # a second tick in the same minute
+                self.status[self.a["id"]] = "online"
+                self.sched.pending.clear()
+                self.now = time.mktime(lt(week * 7 + day, 17, 0))
+                self.sched.tick(time.localtime(self.now), self.now)
+        self.assertEqual(len(starts), 20)                                           # 5 weekdays x 4 weeks
+        self.assertEqual(len(ends), 20)
+        self.assertTrue(all(x.split()[0] in ("Mon", "Tue", "Wed", "Thu", "Fri") for x in starts + ends))
+        self.assertEqual(len(set(starts)), 20)
+
+    def test_overnight_block_repeats_weekly_and_ends_next_morning(self):
+        self.add(start="22:00", end="06:00", days=[4])                                # Friday nights
+        ends = []
+        orig = self.sched.run_action
+        def spy(dev, action, args):
+            if action == "sleep":
+                ends.append(time.strftime("%a %H:%M", time.localtime(self.now)))
+            return orig(dev, action, args)
+        self.sched.run_action = spy
+        self.status[self.a["id"]] = "online"
+        for week in range(3):
+            self.now = time.mktime(lt(week * 7 + 5, 6, 0))                           # Saturday 06:00
+            self.sched.tick(time.localtime(self.now), self.now)
+            self.now = time.mktime(lt(week * 7 + 4, 6, 0))                           # Friday 06:00: nothing ends
+            self.sched.tick(time.localtime(self.now), self.now)
+        self.assertEqual(ends, ["Sat 06:00"] * 3)
+
     def test_disabled_and_paused_do_nothing(self):
         self.add(enabled=False)
         self.sched.tick(lt(MON, 7, 0))

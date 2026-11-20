@@ -582,8 +582,9 @@ pre.out { background: var(--inverse-surface); color: var(--inverse-on-surface); 
 .cb-time { font-size: 11px; font-weight: 800; letter-spacing: .01em; line-height: 1.25; white-space: nowrap; }
 .cb-name { font-size: 12.5px; font-weight: 800; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; }
 .cb-tvs { font-size: 11px; opacity: .8; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rs { position: absolute; left: 0; right: 0; height: 9px; cursor: ns-resize; } .rs-top { top: 0; } .rs-bot { bottom: 0; }
-.rs-bot::after { content: ""; position: absolute; left: 50%; bottom: 3px; width: 18px; height: 3px; margin-left: -9px; border-radius: 2px; background: currentColor; opacity: .35; }
+.rs { position: absolute; left: 0; right: 0; height: min(9px, 28%); cursor: ns-resize; } .rs-top { top: 0; } .rs-bot { bottom: 0; }
+.rs-bot::after { content: ""; position: absolute; left: 50%; bottom: 3px; width: 18px; height: 3px; margin-left: -9px; border-radius: 2px; background: currentColor; opacity: .35; pointer-events: none; }
+.cal-block.short .rs-bot::after { display: none; }
 .cal-hint { position: absolute; left: 52px; right: 0; top: 64px; display: flex; gap: 14px; align-items: center; justify-content: center; padding: 0 24px; text-align: left; pointer-events: none; color: var(--on-surface-variant); z-index: 1; }
 .cal-hint svg { width: 36px; height: 36px; flex: none; fill: currentColor; } .cal-hint b { display: block; font-size: 17px; color: var(--on-surface); } .cal-hint span { font-size: 13.5px; display: block; max-width: 440px; }
 .cal-sub { margin: 28px 0 12px; font-size: 16px; font-weight: 800; }
@@ -599,3 +600,6 @@ pre.out { background: var(--inverse-surface); color: var(--inverse-on-surface); 
   .cal-hint { left: 38px; padding: 0 12px; } .cal-hint svg { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .cal-block { transition: none; } }
+.cal-block.short { padding: 0 6px 0 6px; border-radius: 6px; border-left-width: 3px; }
+.cal-block.short .cb-time { font-size: 9.5px; line-height: 11px; overflow: hidden; text-overflow: ellipsis; }
+.cal-block.short .cb-body { display: none; }

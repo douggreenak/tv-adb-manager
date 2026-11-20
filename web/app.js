@@ -175,13 +175,18 @@ function menu(items, label) {
   return wrap;
 }
 
+const wolBtn = (d, cls) => h("button", { class: "btn " + (cls || "small"), title: d.mac ? "Send a Wake-on-LAN packet to " + d.mac : "MAC address not known yet",
+  disabled: !d.mac, onclick: async e => { e.stopPropagation(); try { const r = await act(d.id, "wol"); toast(r.output, !r.ok); } catch (x) { toast(x.message, true); } } }, ic("power"), "Wake over network");
+
 function unavailable(d, what) {
   const un = d.status === "unauthorized", checking = d.status === "unknown";
   return h("div", { class: "panel empty-panel" }, h("div", { class: "empty-ic" }, ic(un ? "lock" : "tv")),
     h("h3", null, un ? "Waiting for approval" : checking ? "Checking…" : "TV is offline"),
     h("p", { class: "muted" }, un ? "Accept the “Allow USB debugging?” prompt on the TV and tick “Always allow”, then try again."
       : checking ? "Connecting to the TV." : `${what} will be available once the TV is reachable. Check that it's powered on and on the network.`),
-    checking ? null : h("button", { class: "btn", onclick: async () => { const r = await act(d.id, "connect"); toast(r.output || (r.ok ? "Connected" : "Still unreachable"), !r.ok); } }, ic("refresh"), un ? "Try again" : "Reconnect"));
+    checking ? null : h("div", { class: "keys" },
+      h("button", { class: "btn", onclick: async () => { const r = await act(d.id, "connect"); toast(r.output || (r.ok ? "Connected" : "Still unreachable"), !r.ok); } }, ic("refresh"), un ? "Try again" : "Reconnect"),
+      un ? null : wolBtn(d, "")));
 }
 
 /* ---------- login ---------- */
@@ -338,7 +343,9 @@ function card(d) {
     body = h("div", { class: "card-note" }, ic("tv"), d.last_seen ? `Not reachable. Last seen ${ago(d.last_seen)}.` : d.status === "unknown" ? "Checking connection…" : "Not reachable yet. Check that it's on and on the network.");
   }
   if (usable(d)) actions = h("div", { class: "btn-group full" }, quick("Wake", "wake"), quick("Standby", "sleep"), quick("Home", "home"));
-  else if (d.status !== "unknown") actions = h("button", { class: "btn small", onclick: reconnect(d) }, ic("refresh"), d.status === "unauthorized" ? "Try again" : "Reconnect");
+  else if (d.status !== "unknown") actions = h("div", { class: "btn-group full" },
+    h("button", { class: "btn small", onclick: reconnect(d) }, ic("refresh"), d.status === "unauthorized" ? "Try again" : "Reconnect"),
+    d.status === "offline" ? wolBtn(d) : null);
   return h("div", { class: "card" + (sel ? " selected" : ""), tabindex: "0", role: "button", "aria-label": "Open " + d.name,
       onclick: open, onkeydown: e => { if (e.key === "Enter" && e.target === e.currentTarget) open(); } },
     h("div", { class: "card-head" },
@@ -727,16 +734,20 @@ async function tabInfo(body, d) {
 
 function tabSettings(body, d) {
   const name = h("input", { type: "text", id: "sn", value: d.name }), addr = h("input", { type: "text", id: "sa", value: d.addr }),
-    group = h("input", { type: "text", id: "sg", value: d.group, list: "grps2", placeholder: "Optional" });
+    group = h("input", { type: "text", id: "sg", value: d.group, list: "grps2", placeholder: "Optional" }),
+    mac = h("input", { type: "text", id: "sm", value: d.mac || "", placeholder: "aa:bb:cc:dd:ee:ff", autocomplete: "off", spellcheck: "false" });
   body.append(h("div", { class: "panel" }, h("h3", null, "Device"),
     h("div", { class: "field" }, h("label", { for: "sn" }, "Name"), name,
       d.auto_name ? h("span", { class: "hint" }, d.tv_name ? "Using the name set on the TV. Type a name here to use your own instead." : "Will use the name set on the TV once it connects.")
         : d.tv_name ? h("span", { class: "hint" }, `Name on the TV: ${d.tv_name} `, h("button", { class: "btn text small", type: "button", onclick: async () => {
             try { await api("PUT", "/api/devices/" + d.id, { auto_name: true }); await loadDevices(); updateDrawerHead(); renderTab(); toast("Using the TV's name"); } catch (e) { toast(e.message, true); } } }, "Use it")) : null),
     h("div", { class: "field" }, h("label", { for: "sa" }, "Address"), addr),
+    h("div", { class: "field" }, h("label", { for: "sm" }, "MAC address (for Wake-on-LAN)"), mac,
+      h("span", { class: "hint" }, d.mac ? (d.mac_auto ? "Learned from the TV. " : "") + "Used to wake the TV over the network when it is fully off. Wi-Fi-only TVs often can't be woken this way; a TV on Ethernet usually can."
+        : "Learned automatically while the TV is on. You can also type it here.")),
     h("div", { class: "field" }, h("label", { for: "sg" }, "Group"), group, h("datalist", { id: "grps2" }, S.groups.map(g => h("option", { value: g })))),
     h("div", { class: "keys" },
-      h("button", { class: "btn primary", onclick: async () => { try { await api("PUT", "/api/devices/" + d.id, { name: name.value, addr: addr.value, group: group.value }); await loadDevices(); updateDrawerHead(); renderTab(); toast("Saved"); } catch (e) { toast(e.message, true); } } }, "Save"),
+      h("button", { class: "btn primary", onclick: async () => { try { await api("PUT", "/api/devices/" + d.id, { name: name.value, addr: addr.value, group: group.value, mac: mac.value }); await loadDevices(); updateDrawerHead(); renderTab(); toast("Saved"); } catch (e) { toast(e.message, true); } } }, "Save"),
       h("button", { class: "btn", onclick: async () => { const r = await act(d.id, "connect"); toast(r.output || (r.ok ? "Connected" : "Failed"), !r.ok); } }, ic("refresh"), "Reconnect ADB"))),
     h("div", { class: "panel" }, h("h3", null, "Remove"), h("p", { class: "muted", style: "margin-bottom:12px" }, "Removes this TV from the manager. Nothing on the TV changes."),
       h("button", { class: "btn danger", onclick: async () => { if (confirm("Remove " + d.name + " from the manager?")) { await api("DELETE", "/api/devices/" + d.id); closeDrawer(); S.selected.delete(d.id); toast("Removed"); refresh(); } } }, "Remove device")));
@@ -744,7 +755,7 @@ function tabSettings(body, d) {
 
 /* ---------- schedules ---------- */
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const ACTION_LABEL = { wake: "Wake", sleep: "Standby", reboot: "Reboot", home: "Go Home", input: "Switch input" };
+const ACTION_LABEL = { wake: "Wake", wol: "Wake over network", sleep: "Standby", reboot: "Reboot", home: "Go Home", input: "Switch input" };
 function fmtTime(t) {
   const [hh, mm] = t.split(":").map(Number), full = new Date(2000, 0, 1, hh, mm).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   const m = /\s?(AM|PM)$/i.exec(full);

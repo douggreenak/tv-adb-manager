@@ -25,7 +25,7 @@ curl -b jar -H 'X-Requested-With: tvm' -H 'Content-Type: application/json' \
 
 | Method & path | Body / query | Returns |
 |---|---|---|
-| `GET /api/devices` | | `{devices:[…], groups:[…]}`; each device has `id, name, addr, group, status, awake, input, input_name, top, model, manufacturer, android, last_seen, restore:{enabled,last,last_name}` |
+| `GET /api/devices` | | `{devices:[…], groups:[…]}`; each device has `id, name, addr, group, status, awake, input, input_name, top, model, manufacturer, android, last_seen, mac, restore:{enabled,last,last_name}` |
 | `POST /api/devices` | `{name?, addr, group}` | 201 with the device; `addr` defaults to port 5555; an empty `name` follows the TV's own name |
 | `PUT /api/devices/<id>` | any of `name, addr, group, restore:{enabled,last}` | updated device |
 | `DELETE /api/devices/<id>` | | |
@@ -55,7 +55,8 @@ produced no video (the TV's own message is included), `429` too many live views.
 
 | action | extra fields | effect |
 |---|---|---|
-| `wake`, `sleep`, `home`, `back` | | key events |
+| `wake`, `sleep`, `home`, `back` | | key events. `wake` on an offline TV with a known MAC sends Wake-on-LAN instead |
+| `wol` | | send a Wake-on-LAN packet to the device's MAC (`mac` field; set with `PUT /api/devices/<id>` `{mac}`) |
 | `key` | `key`: `KEYCODE_*` or a number | any key |
 | `reboot` | | `adb reboot` |
 | `input` | `input`: full input id | wakes the TV and launches the input |

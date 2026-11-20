@@ -38,6 +38,20 @@ Cards for TVs that are offline or waiting for approval show what to do instead o
 **Reconnect / Try again** button. The drawer's Remote, Inputs, Apps, Install, Shell and Info tabs show the same
 explanation, and refresh themselves the moment the TV comes back. Settings and the power-on options stay usable.
 
+## Wake-on-LAN (TVs that are fully off)
+
+A TV that is fully powered off has no ADB connection, so Wake can't reach it. If the TV has a MAC address on
+record, **Wake over network** (offline cards and the drawer) sends a Wake-on-LAN packet, and the normal
+**Wake** button and scheduled wakes fall back to it automatically when the TV is offline. Once the TV is up
+again, power-on restore puts it back on its last input.
+
+- The MAC is filled in automatically for TVs on the server's own subnet (read from the ARP table when the TV
+  connects). Android 11 TVs won't report it over ADB, so for other subnets type it in the TV's **Settings** tab.
+- Whether a TV answers depends on the TV: standby usually works, fully off often doesn't, and Wi-Fi-only TVs
+  rarely do. Enable "Wake on LAN / Wake on Wi-Fi" or "Quick start" in the TV's own menu. The server sends to
+  the broadcast address, the TV's /24 broadcast and the TV itself, so routed subnets need directed broadcasts allowed.
+- The manager's own **Standby** button sends the standby key, so it never causes a full power-off.
+
 ## Devices
 
 Each card shows the TV's state (**On**, **Standby**, **Offline**, **Needs approval on TV**), model and

@@ -8,6 +8,7 @@ import uuid
 from collections import deque
 
 from .parsers import SAFE_ADDR
+from .wol import normalize_mac
 
 
 def _atomic_write(path, data, mode=None):
@@ -95,6 +96,9 @@ class Store:
                         d["auto_name"] = False                          # the user chose a name: stop overwriting it
                     if "auto_name" in fields and fields["auto_name"] is not None:
                         d["auto_name"] = bool(fields["auto_name"])
+                    if "mac" in fields and fields["mac"] is not None:
+                        d["mac"] = normalize_mac(fields["mac"])
+                        d["mac_auto"] = False                           # typed by the user: don't overwrite
                     for k in ("name", "addr", "group", "restore"):
                         if k in fields and fields[k] is not None:
                             d[k] = fields[k].strip() if k == "name" else fields[k]
@@ -117,6 +121,17 @@ class Store:
                 self._save("devices.json", self._devices)
                 return name
         return None
+
+    def set_learned_mac(self, dev_id, mac):
+        """Remember the MAC the TV reported, unless the user entered one. Returns True if it changed."""
+        mac = normalize_mac(mac)
+        with self.lock:
+            for d in self._devices:
+                if d["id"] == dev_id and mac and d.get("mac_auto", True) and d.get("mac") != mac:
+                    d["mac"], d["mac_auto"] = mac, True
+                    self._save("devices.json", self._devices)
+                    return True
+        return False
 
     def delete_device(self, dev_id):
         with self.lock:

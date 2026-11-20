@@ -6,12 +6,14 @@ Per device, every cycle:
   * remember the active passthrough input while awake
   * on wake / reconnect (cold boot) schedule a restore of the remembered input
 """
+import re
 import threading
 import time
 import urllib.parse
 from concurrent.futures import ThreadPoolExecutor
 
 from . import parsers as P
+from . import wol
 
 PROBE = ("(dumpsys power | grep -m1 mWakefulness=; echo ==; "
          "dumpsys tv_input | grep -A1 'SessionState@' | grep inputId; echo ==; "
@@ -19,7 +21,9 @@ PROBE = ("(dumpsys power | grep -m1 mWakefulness=; echo ==; "
 STATIC_PROBE = ("getprop ro.product.manufacturer; echo ==; getprop ro.product.model; echo ==; "
                 "getprop ro.build.version.release; echo ==; settings get secure tv_input_custom_labels; echo ==; "
                 "cmd package resolve-activity --brief -a android.intent.action.MAIN "
-                "-c android.intent.category.HOME 2>/dev/null | tail -1; echo ==; settings get global device_name")
+                "-c android.intent.category.HOME 2>/dev/null | tail -1; echo ==; settings get global device_name; echo ==; "
+                "for i in eth0 wlan0; do echo $i $(cat /sys/class/net/$i/address 2>/dev/null) "
+                "$(ip -f inet addr show $i 2>/dev/null | grep -o 'inet [0-9.]*'); done")
 
 GENERIC_NAMES = {"android tv", "google tv", "tv", "smart tv", "smarttv", "android", "android box"}
 
@@ -31,6 +35,20 @@ def display_name(tv_name, model, addr):
     if t.lower() in GENERIC_NAMES or t.lower() == (model or "").strip().lower():
         return "%s · .%s" % (t, addr.split(":")[0].rsplit(".", 1)[-1])
     return t
+
+
+def pick_mac(text, addr):
+    """From lines like 'wlan0 aa:bb:.. inet 10.0.0.5' choose the MAC of the interface that carries `addr`."""
+    host = addr.split(":")[0]
+    found = []
+    for line in text.splitlines():
+        m = re.match(r"^\S+\s+((?:[0-9a-f]{2}:){5}[0-9a-f]{2})\s*(?:inet (\S+))?", line.strip(), re.I)
+        if m:
+            found.append((m.group(1).lower(), m.group(2)))
+    for mac, ip in found:
+        if ip == host:
+            return mac
+    return found[0][0] if len(found) == 1 else None
 
 
 WAKE_SETTLE = 3.0       # seconds after waking before we look at what the TV did by itself
@@ -217,6 +235,11 @@ class Monitor:
                       home=(parts[4].split("/")[0] or None),
                       tv_name=(tv if tv and tv != "null" else None))
             st["static_loaded"] = True
+            mac = pick_mac(parts[6] if len(parts) > 6 else "", addr) or wol.arp_mac(addr.split(":")[0])
+            if mac:
+                st["mac"] = mac
+                if dev is not None and self.store.set_learned_mac(dev["id"], mac):
+                    self.events.add(dev["name"], "learned MAC address %s (for Wake-on-LAN)" % mac)
             if dev is not None:
                 self.apply_auto_name(dev["id"])
 

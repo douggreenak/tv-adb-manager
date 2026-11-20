@@ -15,6 +15,7 @@ from . import parsers as P
 from .adb import Adb
 from .auth import Auth
 from . import live as livemod
+from . import wol
 from .monitor import Monitor, launch_input
 from .scheduler import Scheduler, validate as validate_schedule
 from .store import EventLog, Store
@@ -58,6 +59,7 @@ class App:
             "auto_name": d.get("auto_name", False), "tv_name": st.get("tv_name"),
             "restore": {"enabled": (d.get("restore") or {}).get("enabled", True), "last": last,
                         "last_name": P.short_input_name(last, labels) if last else None},
+            "mac": d.get("mac") or st.get("mac") or "", "mac_auto": d.get("mac_auto", True),
             "status": st.get("status", "unknown"), "awake": st.get("awake"),
             "input": inp, "input_name": P.short_input_name(inp, labels) if inp else None,
             "top": st.get("top"), "manufacturer": st.get("manufacturer"), "model": st.get("model"),
@@ -77,10 +79,25 @@ class App:
         rc, out = self.adb.shell(dev["addr"], "input keyevent %s" % keycode)
         return rc == 0, out.strip()
 
+    def wake_on_lan(self, dev):
+        st = self.monitor.snapshot(dev["id"]) or {}
+        mac = dev.get("mac") or st.get("mac")
+        if not mac:
+            return False, "No MAC address known yet. It is learned while the TV is on, or enter it in Settings."
+        n = wol.send(mac, dev["addr"].split(":")[0])
+        if not n:
+            return False, "Could not send the Wake-on-LAN packet from this server."
+        return True, "Sent Wake-on-LAN to %s. A TV that is fully off may not respond; standby usually does." % mac
+
     def run_action(self, dev, action, args=None):
         args = args or {}
         addr = dev["addr"]
+        if action == "wol":
+            return self.wake_on_lan(dev)
         if action == "wake":
+            st = self.monitor.snapshot(dev["id"]) or {}
+            if st.get("status") in ("offline", "unknown") and (dev.get("mac") or st.get("mac")):
+                return self.wake_on_lan(dev)          # fully off: ADB can't reach it, so use the network
             return self.key(dev, "KEYCODE_WAKEUP")
         if action == "sleep":
             return self.key(dev, "KEYCODE_SLEEP")
@@ -265,7 +282,7 @@ def r_update_device(h, m, q):
     a = h.app
     d = a.require_device(m.group(1))
     b = h._json_body()
-    fields = {k: b[k] for k in ("name", "addr", "group", "auto_name") if k in b}
+    fields = {k: b[k] for k in ("name", "addr", "group", "auto_name", "mac") if k in b}
     if "restore" in b and isinstance(b["restore"], dict):
         r = dict(d.get("restore") or {})
         if "enabled" in b["restore"]:
@@ -302,7 +319,7 @@ def r_action(h, m, q):
         ok, out = a.key(d, b.get("key"))
     else:
         ok, out = a.run_action(d, action, b)
-    if action in ("reboot", "sleep", "wake", "input", "restore"):
+    if action in ("reboot", "sleep", "wake", "wol", "input", "restore"):
         a.events.add(d["name"], "%s%s" % (action, "" if ok else " failed: %s" % out), "info" if ok else "error")
     h._send(200, {"ok": ok, "output": out})
 
@@ -322,7 +339,7 @@ def r_bulk(h, m, q):
             continue
         ok, out = a.key(d, b["key"]) if action == "key" else a.run_action(d, action, b)
         results[i] = {"ok": ok, "output": out}
-        if action in ("reboot", "sleep", "wake", "input", "restore"):
+        if action in ("reboot", "sleep", "wake", "wol", "input", "restore"):
             a.events.add(d["name"], "bulk %s%s" % (action, "" if ok else " failed: %s" % out), "info" if ok else "error")
     h._send(200, {"results": results})
 

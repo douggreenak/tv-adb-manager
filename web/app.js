@@ -340,7 +340,7 @@ function card(d) {
   } else if (d.status === "unauthorized") {
     body = h("div", { class: "card-note" }, ic("lock"), "Accept the “Allow USB debugging?” prompt on this TV to let the manager connect.");
   } else {
-    body = h("div", { class: "card-note" }, ic("tv"), d.last_seen ? `Not reachable. Last seen ${ago(d.last_seen)}.` : d.status === "unknown" ? "Checking connection…" : "Not reachable yet. Check that it's on and on the network.");
+    body = h("div", { class: "card-note" }, ic("tv"), d.network === true ? "On the network, but ADB isn't connected. Reconnecting…" : d.last_seen ? `Not reachable. Last seen ${ago(d.last_seen)}.` : d.status === "unknown" ? "Checking connection…" : "Not reachable yet. Check that it's on and on the network.");
   }
   if (usable(d)) actions = h("div", { class: "btn-group full" }, quick("Wake", "wake"), quick("Standby", "sleep"), quick("Home", "home"));
   else if (d.status !== "unknown") actions = h("div", { class: "btn-group full" },
@@ -861,6 +861,18 @@ async function renderEvents() {
       : groups.flatMap(([label, evs]) => [h("div", { class: "ev-day" }, label), h("div", { class: "ev-list" }, evs.map(evRow))])));
 }
 
+function keepalivePanel() {
+  const opts = [[0, "Off"], [2, "2 s"], [5, "5 s"], [10, "10 s"], [30, "30 s"]];
+  const group = h("div", { class: "btn-group", role: "group", "aria-label": "Keepalive interval" });
+  const draw = cur => group.replaceChildren(...opts.map(([v, l]) => h("button", { class: "btn", "aria-pressed": String(cur === v), onclick: async () => {
+    try { const r = await api("PUT", "/api/settings", { keepalive: v }); draw(r.keepalive); toast(r.keepalive ? `Keepalive every ${r.keepalive} s` : "Keepalive off"); } catch (e) { toast(e.message, true); } } }, l)));
+  draw(-1);
+  api("GET", "/api/settings").then(r => draw(r.keepalive)).catch(() => {});
+  return h("div", { class: "panel" }, h("h3", null, "Network keepalive"),
+    h("p", { class: "muted", style: "margin-bottom:12px" }, "Sends a tiny message to every TV at this interval. It keeps a TV in standby on the network and reconnects the manager the moment a TV is reachable again. It can't stop a TV that powers itself fully off."),
+    h("div", { class: "field", style: "margin-bottom:0" }, h("label", null, "Send every"), group));
+}
+
 function renderSettings() {
   const main = $("#main"); if (!main) return;
   const cur = h("input", { type: "password", id: "pc", autocomplete: "current-password" }), nw = h("input", { type: "password", id: "pn", autocomplete: "new-password" });
@@ -882,6 +894,7 @@ function renderSettings() {
         h("div", { class: "field", style: "margin-bottom:0" }, h("label", null, "Accent colour", h("span", { class: "swatch-name" }, hueName)),
           h("div", { class: "swatches", role: "group", "aria-label": "Accent colour" }, HUES.map(([n, v]) =>
             h("button", { class: "swatch", style: `--sw:${v}`, title: n, "aria-label": n, "aria-pressed": String(hue === v), onclick: () => setHue(v) }, ic("check")))))),
+      keepalivePanel(),
       h("div", { class: "panel" }, h("h3", null, "Change password"),
         h("div", { class: "field" }, h("label", { for: "pc" }, "Current password"), cur),
         h("div", { class: "field" }, h("label", { for: "pn" }, "New password"), nw, h("span", { class: "hint" }, "At least 8 characters.")),

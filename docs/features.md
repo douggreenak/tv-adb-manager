@@ -52,6 +52,20 @@ again, power-on restore puts it back on its last input.
   the broadcast address, the TV's /24 broadcast and the TV itself, so routed subnets need directed broadcasts allowed.
 - The manager's own **Standby** button sends the standby key, so it never causes a full power-off.
 
+## Network keepalive
+
+*Settings → Network keepalive* (default every 5 s; Off, 2, 5, 10 or 30 s). The server opens a tiny TCP connection to
+each TV at that interval. This keeps a TV in standby on the network, and it tells apart a TV that is **on the
+network but whose ADB dropped** (the manager reconnects immediately, and the card says so) from one that has **left
+the network** (logged in Activity). It cannot stop a TV that powers itself fully off; for that, change the TV's own
+timers (below).
+
+### TV settings that power a TV fully off
+Found on the real TVs (Settings → Device Preferences / System → Power & Energy):
+- **Energy saver → Automatically turn off when inactive** (Google TV default 24 h): switches the TV fully off after a day with no remote input. Set to Never.
+- **No Signal Auto Power Off** (TCL, 15 min): powers off when the HDMI source goes quiet. Set to Off.
+- **Switch Off Timer / Sleep Timer / Power Off Timer Type**: keep Off.
+
 ## Devices
 
 Each card shows the TV's state (**On**, **Standby**, **Offline**, **Needs approval on TV**), model and

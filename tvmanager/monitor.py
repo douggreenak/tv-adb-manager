@@ -108,6 +108,14 @@ class Monitor:
                 self.inflight.add(d["id"])
             self.pool.submit(self._run_cycle, d, adb_states.get(d["addr"]))
 
+    def kick(self, dev):
+        """Try an ADB reconnect now (used by the keepalive when the TV answers on the network)."""
+        st = self._st(dev["id"])
+        now = time.time()
+        if st["status"] in ("offline", "unknown") and now - st["last_try"] > 3:
+            st["last_try"] = now
+            self.pool.submit(self.adb.connect, dev["addr"])
+
     def _run_cycle(self, dev, adb_state):
         try:
             self.cycle(dev, adb_state)

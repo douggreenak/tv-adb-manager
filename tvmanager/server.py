@@ -16,6 +16,7 @@ from .adb import Adb
 from .auth import Auth
 from . import live as livemod
 from . import wol
+from .keepalive import KeepAlive, clamp as clamp_keepalive
 from .monitor import Monitor, launch_input
 from .scheduler import Scheduler, validate as validate_schedule
 from .store import EventLog, Store
@@ -42,11 +43,13 @@ class App:
         self.auth = Auth(data_dir, env_password, log=lambda m: print(m, flush=True))
         self.monitor = Monitor(self.adb, self.store, self.events, poll=poll)
         self.scheduler = Scheduler(self.store, self.events, self.run_action)
+        self.keepalive = KeepAlive(self.store, self.monitor, self.events)
         self.live = livemod.LiveManager()
         self.started = time.time()
         if start_threads:
             self.monitor.start()
             self.scheduler.start()
+            self.keepalive.start()
 
     # ---- views ---------------------------------------------------------
     def device_view(self, d):
@@ -59,6 +62,7 @@ class App:
             "auto_name": d.get("auto_name", False), "tv_name": st.get("tv_name"),
             "restore": {"enabled": (d.get("restore") or {}).get("enabled", True), "last": last,
                         "last_name": P.short_input_name(last, labels) if last else None},
+            "network": (self.keepalive.view(d["id"]) or {}).get("up"),
             "mac": d.get("mac") or st.get("mac") or "", "mac_auto": d.get("mac_auto", True),
             "status": st.get("status", "unknown"), "awake": st.get("awake"),
             "input": inp, "input_name": P.short_input_name(inp, labels) if inp else None,
@@ -123,6 +127,7 @@ class App:
     def shutdown(self):
         self.monitor.stop()
         self.scheduler.stop()
+        self.keepalive.stop()
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -260,6 +265,24 @@ def r_password(h, m, q):
     token = h.app.auth.login(h.client_address[0], str(body.get("new")))
     h._send(200, {"ok": True}, extra={
         "Set-Cookie": "%s=%s; HttpOnly; SameSite=Strict; Path=/; Max-Age=%d" % (COOKIE, token, 7 * 24 * 3600)})
+
+
+@route("GET", "/api/settings")
+def r_settings(h, m, q):
+    h._send(200, {"keepalive": clamp_keepalive(h.app.store.settings().get("keepalive", 5))})
+
+
+@route("PUT", "/api/settings")
+def r_put_settings(h, m, q):
+    b = h._json_body()
+    if "keepalive" in b:
+        try:
+            v = clamp_keepalive(b["keepalive"])
+        except (TypeError, ValueError):
+            raise ApiError(400, "keepalive must be a number of seconds (0 turns it off)")
+        h.app.store.set_settings(keepalive=v)
+        h.app.events.add("-", "network keepalive %s" % ("every %d s" % v if v else "turned off"))
+    h._send(200, {"keepalive": clamp_keepalive(h.app.store.settings().get("keepalive", 5))})
 
 
 @route("GET", "/api/devices")

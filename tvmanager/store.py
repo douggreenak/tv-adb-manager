@@ -36,6 +36,7 @@ class Store:
         self.lock = threading.RLock()
         self._devices = self._load("devices.json", [])
         self._schedules = self._load("schedules.json", [])
+        self._settings = self._load("settings.json", {})
         self._migrate_names()
 
     def _load(self, name, default):
@@ -58,6 +59,17 @@ class Store:
                 changed = True
         if changed:
             self._save("devices.json", self._devices)
+
+    # ---- server settings -----------------------------------------------
+    def settings(self):
+        with self.lock:
+            return dict(self._settings)
+
+    def set_settings(self, **fields):
+        with self.lock:
+            self._settings.update(fields)
+            self._save("settings.json", self._settings)
+            return dict(self._settings)
 
     # ---- devices -------------------------------------------------------
     def devices(self):

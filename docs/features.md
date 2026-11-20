@@ -60,11 +60,23 @@ network but whose ADB dropped** (the manager reconnects immediately, and the car
 the network** (logged in Activity). It cannot stop a TV that powers itself fully off; for that, change the TV's own
 timers (below).
 
-### TV settings that power a TV fully off
-Found on the real TVs (Settings → Device Preferences / System → Power & Energy):
-- **Energy saver → Automatically turn off when inactive** (Google TV default 24 h): switches the TV fully off after a day with no remote input. Set to Never.
-- **No Signal Auto Power Off** (TCL, 15 min): powers off when the HDMI source goes quiet. Set to Off.
-- **Switch Off Timer / Sleep Timer / Power Off Timer Type**: keep Off.
+## Keep on
+
+Each TV has a **Keep this TV on** switch (drawer → Settings, on by default). The manager sets the TV's own timers so it
+stays on until you use Standby or a schedule, and re-checks them every 10 minutes because the TV's own menus can
+rewrite them. It changes only what differs and logs it in Activity ("keep-on: turn-off timer 28800000→never …").
+
+| Setting | Meaning | Set to |
+|---|---|---|
+| `secure sleep_timeout` | Energy saver, "Automatically turn off when inactive" (fully powers the TV off; 8–24 h by default) | never (2147483647) |
+| `system screen_off_timeout` | display-off / screensaver timer | never |
+| `global stay_on_while_plugged_in` | keep the screen on on mains power | 7 |
+| `global no_signal_auto_power_off` | "No signal auto power off" (TCL, 15 min), only where the TV has it | 0 (Off) |
+
+Turning the switch off puts back the values the TV had before (the originals are remembered). The TV's own
+Energy saver menu has no "Never" choice and rewrites unknown values to a listed one, so avoid opening it.
+Unplugging the TV, a power cut, or someone long-pressing the remote's power button still turns it off; Wake-on-LAN
+and the keepalive help it back.
 
 ## Devices
 

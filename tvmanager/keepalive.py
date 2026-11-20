@@ -21,7 +21,7 @@ def clamp(v):
     return 0 if v <= 0 else max(MIN_INTERVAL, min(MAX_INTERVAL, v))
 
 
-def probe(addr, timeout=1.5, connect=socket.create_connection):
+def probe(addr, timeout=3.0, connect=socket.create_connection):
     """True if the TV answers on the network: an accepted OR refused connection both mean it is up."""
     host, _, port = addr.partition(":")
     try:
@@ -68,6 +68,8 @@ class KeepAlive:
 
     def record(self, dev, up, now=None):
         now = now or time.time()
+        if not up and (self.monitor.snapshot(dev["id"]) or {}).get("status") in ("online", "asleep"):
+            up = True                # ADB is talking to it, so it is on the network (a slow probe is not an outage)
         with self.lock:
             prev = self.net.get(dev["id"])
             changed = prev is not None and prev["up"] != up          # the first probe is not a change

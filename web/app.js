@@ -745,6 +745,10 @@ function tabSettings(body, d) {
     h("div", { class: "field" }, h("label", { for: "sm" }, "MAC address (for Wake-on-LAN)"), mac,
       h("span", { class: "hint" }, d.mac ? (d.mac_auto ? "Learned from the TV. " : "") + "Used to wake the TV over the network when it is fully off. Wi-Fi-only TVs often can't be woken this way; a TV on Ethernet usually can."
         : "Learned automatically while the TV is on. You can also type it here.")),
+    h("label", { class: "row", style: "margin-bottom:14px" }, h("span", { class: "grow" }, "Keep this TV on",
+      h("span", { class: "sub", style: "display:block" }, "Turns off the TV's own auto power-off, sleep and no-signal timers, so it stays on until you use Standby or a schedule. Turning this off restores the TV's original timers.")),
+      h("input", { type: "checkbox", class: "switch", role: "switch", checked: d.keep_on, "aria-label": "Keep this TV on", onchange: async e => {
+        try { await api("PUT", "/api/devices/" + d.id, { keep_on: e.target.checked }); await loadDevices(); toast(e.target.checked ? "Keeping this TV on" : "TV timers restored"); } catch (x) { e.target.checked = !e.target.checked; toast(x.message, true); } } })),
     h("div", { class: "field" }, h("label", { for: "sg" }, "Group"), group, h("datalist", { id: "grps2" }, S.groups.map(g => h("option", { value: g })))),
     h("div", { class: "keys" },
       h("button", { class: "btn primary", onclick: async () => { try { await api("PUT", "/api/devices/" + d.id, { name: name.value, addr: addr.value, group: group.value, mac: mac.value }); await loadDevices(); updateDrawerHead(); renderTab(); toast("Saved"); } catch (e) { toast(e.message, true); } } }, "Save"),

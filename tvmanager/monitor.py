@@ -14,6 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from . import parsers as P
 from . import wol
+from . import keepon
 
 PROBE = ("(dumpsys power | grep -m1 mWakefulness=; echo ==; "
          "dumpsys tv_input | grep -A1 'SessionState@' | grep inputId; echo ==; "
@@ -51,6 +52,7 @@ def pick_mac(text, addr):
     return found[0][0] if len(found) == 1 else None
 
 
+KEEP_ON_RECHECK = 600.0     # re-read the TV's timers this often (its own menus can rewrite them)
 WAKE_SETTLE = 3.0       # seconds after waking before we look at what the TV did by itself
 CONNECT_RETRY = 10.0
 UNAUTH_RETRY = 30.0
@@ -174,6 +176,8 @@ class Monitor:
         if not st.get("static_loaded"):
             self._load_static(st, addr, dev)
 
+        self.keep_on(dev, st)
+
         # Came back after being unreachable (e.g. power loss + cold boot) counts as a wake too.
         reconnected = st["seen_online"] and st["status"] in ("offline", "unauthorized")
         woke = bool(awake) and (st["awake"] is False or reconnected)
@@ -193,6 +197,43 @@ class Monitor:
         if st["wake_at"] and now >= st["wake_at"] and awake:
             st["wake_at"] = None
             self._restore(dev, st, inp, top)
+
+    def keep_on(self, dev, st, force=False):
+        """Make sure the TV's own power-off and sleep timers are off (unless turned off for this TV)."""
+        if not dev.get("keep_on", True):
+            return
+        now = time.time()
+        if not force and now - st.get("keepon_at", 0) < KEEP_ON_RECHECK:
+            return
+        st["keepon_at"] = now
+        rc, out = self.adb.shell(dev["addr"], keepon.READ_CMD)
+        cur = keepon.parse(out)
+        if rc != 0 or not cur:
+            st["keepon_at"] = 0
+            return
+        changes = keepon.plan(cur)
+        if not changes:
+            return
+        rc, out = self.adb.shell(dev["addr"], keepon.put_cmd(changes))
+        if rc != 0:
+            self.events.add(dev["name"], "could not apply keep-on: %s" % out.strip()[:120], "error")
+            return
+        prev = dict(dev.get("keep_on_prev") or {})
+        for t, k, _ in changes:
+            prev.setdefault("%s.%s" % (t, k), cur.get("%s.%s" % (t, k)))      # remember the original, once
+        self.store.update_device(dev["id"], keep_on_prev=prev)
+        self.events.add(dev["name"], "keep-on: " + keepon.describe(changes, cur))
+
+    def revert_keep_on(self, dev):
+        """Put the TV's own timers back to what they were before keep-on changed them."""
+        prev = dev.get("keep_on_prev") or {}
+        if prev:
+            rc, out = self.adb.shell(dev["addr"], keepon.revert_cmd(prev))
+            if rc != 0:
+                return False, out.strip()
+        self.store.update_device(dev["id"], keep_on_prev={})
+        self.events.add(dev["name"], "keep-on turned off; TV timers restored")
+        return True, "restored"
 
     def _restore(self, dev, st, current_input, top):
         name = dev["name"]

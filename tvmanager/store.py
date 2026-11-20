@@ -111,6 +111,9 @@ class Store:
                     if "mac" in fields and fields["mac"] is not None:
                         d["mac"] = normalize_mac(fields["mac"])
                         d["mac_auto"] = False                           # typed by the user: don't overwrite
+                    for k in ("keep_on", "keep_on_prev"):
+                        if k in fields:
+                            d[k] = fields[k]
                     for k in ("name", "addr", "group", "restore"):
                         if k in fields and fields[k] is not None:
                             d[k] = fields[k].strip() if k == "name" else fields[k]

@@ -62,6 +62,7 @@ class App:
             "auto_name": d.get("auto_name", False), "tv_name": st.get("tv_name"),
             "restore": {"enabled": (d.get("restore") or {}).get("enabled", True), "last": last,
                         "last_name": P.short_input_name(last, labels) if last else None},
+            "keep_on": d.get("keep_on", True),
             "network": (self.keepalive.view(d["id"]) or {}).get("up"),
             "mac": d.get("mac") or st.get("mac") or "", "mac_auto": d.get("mac_auto", True),
             "status": st.get("status", "unknown"), "awake": st.get("awake"),
@@ -316,7 +317,17 @@ def r_update_device(h, m, q):
                 raise ApiError(400, "invalid input id")
             r["last"] = v or None
         fields["restore"] = r
+    if "keep_on" in b:
+        want = bool(b["keep_on"])
+        if want != d.get("keep_on", True):
+            fields["keep_on"] = want
+            if not want:
+                ok, out = a.monitor.revert_keep_on(d)
+                if not ok:
+                    raise ApiError(502, "Could not restore the TV's timers: " + out)
     updated = a.store.update_device(d["id"], **fields)
+    if fields.get("keep_on"):
+        a.monitor.keep_on(a.store.device(d["id"]), a.monitor._st(d["id"]), force=True)
     if fields.get("auto_name"):
         a.monitor.apply_auto_name(d["id"])          # take the TV's name straight away if we already know it
         updated = a.store.device(d["id"])

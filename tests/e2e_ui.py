@@ -85,12 +85,14 @@ with sync_playwright() as p:
     pg.locator(".card[aria-label='Open Cafe']").click(); pg.wait_for_selector(".drawer"); pg.click("role=tab[name='Screen']"); pg.click(".viewer-overlay .big-play")
     expect(pg.locator(".viewer-msg")).to_contain_text("No video from the TV", timeout=20000); assert_clean(pg, "Screen error state"); pg.screenshot(path=OUT + "/f_screen_error.png"); pg.keyboard.press("Escape")
     # standby -> wake -> expect auto restore of Soundbar on Lobby
-    pg.locator(".card[aria-label='Open Lobby'] >> text=Standby").click(); pg.wait_for_timeout(3500)
-    expect(pg.locator(".card[aria-label='Open Lobby'] .status")).to_have_text("Standby")
+    labels = pg.locator(".card[aria-label='Open Lobby'] .btn-group.full button").all_inner_texts()
+    assert labels[:2] == ["Wake", "Sleep"], "Sleep sits right next to Wake on each card: %s" % labels
+    pg.locator(".card[aria-label='Open Lobby'] >> text=Sleep").click(); pg.wait_for_timeout(3500)
+    expect(pg.locator(".card[aria-label='Open Lobby'] .status")).to_have_text("Asleep")
     pg.locator(".card[aria-label='Open Lobby'] >> text=Wake").click(); pg.wait_for_timeout(9000)
     assert "HW2" in [l for l in ctl("list").splitlines() if "10.0.0.11" in l][0], ctl("list")
     # bulk: select all lobby-group, standby
-    pg.click(".chip:has-text('Lobby')"); pg.click("text=Select all"); pg.click(".bulkbar >> text=Standby"); pg.wait_for_timeout(3500)
+    pg.click(".chip:has-text('Lobby')"); pg.click("text=Select all"); pg.click(".bulkbar >> text=Sleep"); pg.wait_for_timeout(3500)
     pg.screenshot(path=OUT + "/f_bulk.png")
     # schedule calendar: drag on Wednesday 9:00-11:00, pick a TV, then move and resize the block
     api = lambda path: pg.context.request.get("http://127.0.0.1:8431" + path).json()

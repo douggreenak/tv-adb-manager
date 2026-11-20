@@ -181,7 +181,7 @@ class Monitor:
         # Came back after being unreachable (e.g. power loss + cold boot) counts as a wake too.
         reconnected = st["seen_online"] and st["status"] in ("offline", "unauthorized")
         woke = bool(awake) and (st["awake"] is False or reconnected)
-        st.update(awake=awake, input=inp, top=top, last_seen=now, seen_online=True)
+        st.update(awake=awake, wakefulness=P.parse_wakefulness_raw(parts[0]), input=inp, top=top, last_seen=now, seen_online=True)
         self._set_status(st, name, "online" if awake else "asleep", quiet=True)
 
         restore = dict(dev.get("restore") or {})

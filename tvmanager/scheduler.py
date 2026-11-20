@@ -38,10 +38,11 @@ def occurrences(s, now_min):
             yield elapsed
 
 
-def ends_now(s, now_min):
-    """True in the minute a window ends."""
+def minutes_since_end(s, now_min):
+    """Minutes since this window last ended (0 = this very minute), or None if it has no days."""
     start, dur = parse_hm(s["start"]), duration(s)
-    return any((now_min - (d * 1440 + start + dur)) % WEEK == 0 for d in s.get("days", []))
+    gaps = [(now_min - (d * 1440 + start + dur)) % WEEK for d in s.get("days", [])]
+    return min(gaps) if gaps else None
 
 
 def validate_window(data, existing_id=None):
@@ -89,7 +90,7 @@ def validate(data, existing_id=None):
 
 class Scheduler:
     def __init__(self, store, events, run_action, get_status=None):
-        """run_action(device_dict, action, args_dict) -> (ok, message); get_status(device_dict) -> status string"""
+        """run_action(device_dict, action, args_dict) -> (ok, message); get_status(device_dict) -> 'online', 'dreaming' (screensaver), 'asleep', 'offline', ..."""
         self.store, self.events, self.run_action = store, events, run_action
         self.get_status = get_status or (lambda dev: "unknown")
         self._stop = threading.Event()
@@ -130,13 +131,19 @@ class Scheduler:
                 self._handled.add(key)
                 if elapsed <= CATCH_UP or s.get("updated", 0) >= start_ts - 60:      # on time, or drawn while it was running
                     self._begin(s, now_ts)
-        stamp = time.strftime("%Y-%m-%d %H:%M", lt)
         for s in windows:
-            if ends_now(s, now_min) and self._fired.get(("end", s["id"])) != stamp:
-                self._fired[("end", s["id"])] = stamp
+            since = minutes_since_end(s, now_min)
+            if since is None or since > CATCH_UP:
+                continue
+            end_ts = now_ts - since * 60 - lt.tm_sec
+            key = ("end", s["id"], int(end_ts // 60))
+            if key in self._handled:
+                continue
+            self._handled.add(key)
+            if s.get("updated", 0) <= end_ts:               # not for a block that was drawn after it had already ended
                 self._end(s, windows, now_min)
         if len(self._handled) > 500:
-            self._handled = set(sorted(self._handled, key=lambda k: k[1])[-200:])
+            self._handled = set(sorted(self._handled, key=lambda k: k[-1])[-200:])
 
     def _begin(self, s, now_ts):
         label = s.get("name") or "schedule"
@@ -175,9 +182,9 @@ class Scheduler:
             if any(o["id"] != s["id"] and dev_id in o["targets"] and any(True for _ in occurrences(o, now_min)) for o in windows):
                 continue                                   # another window keeps this TV on
             self.pending.pop(dev_id, None)
-            if self.get_status(dev) == "online":
+            if self.get_status(dev) in ("online", "dreaming"):      # a TV on its screensaver is still lit
                 ok, msg = self.run_action(dev, "sleep", {})
-                self.events.add(dev["name"], "schedule '%s' ended: standby%s" % (label, "" if ok else " failed: %s" % msg), "info" if ok else "error")
+                self.events.add(dev["name"], "schedule '%s' ended: sleep%s" % (label, "" if ok else " failed: %s" % msg), "info" if ok else "error")
 
     # ---- single timed actions (older style) ------------------------------
     def _tick_actions(self, lt):

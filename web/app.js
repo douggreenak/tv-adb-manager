@@ -122,7 +122,7 @@ function ago(ts) {
 }
 const fmtKb = kb => kb == null ? "?" : kb > 1048576 ? (kb / 1048576).toFixed(1) + " GB" : Math.round(kb / 1024) + " MB";
 const fmtBytes = n => n > 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB";
-const STATUS_TEXT = { online: "On", asleep: "Standby", offline: "Offline", unauthorized: "Needs approval on TV", unknown: "Checking…" };
+const STATUS_TEXT = { online: "On", asleep: "Asleep", offline: "Offline", unauthorized: "Needs approval on TV", unknown: "Checking…" };
 const usable = d => !!d && (d.status === "online" || d.status === "asleep");
 
 const APP_NAMES = {
@@ -295,7 +295,7 @@ function renderDevices() {
   const sel = [...S.selected].filter(id => byId(id));
   const bulk = sel.length ? h("div", { class: "bulkbar" },
     h("strong", null, sel.length + " selected"),
-    ...[["wake", "Wake"], ["sleep", "Standby"], ["home", "Home"], ["restore", "Restore input"]].map(([a, l]) =>
+    ...[["wake", "Wake"], ["sleep", "Sleep"], ["home", "Home"], ["restore", "Restore input"]].map(([a, l]) =>
       h("button", { class: "btn small", onclick: () => bulk_(a, sel) }, l)),
     h("button", { class: "btn small danger", onclick: () => confirm("Reboot " + sel.length + " device(s)?") && bulk_("reboot", sel) }, "Reboot"),
     h("span", { style: "flex:1" }),
@@ -308,7 +308,7 @@ function renderDevices() {
 
   main.replaceChildren(
     h("div", { class: "page-head" }, h("h1", null, "Devices"),
-      h("div", { class: "stats" }, stat("on", online + " on"), stat("sb", asleep + " standby"), stat("", off + " offline"))),
+      h("div", { class: "stats" }, stat("on", online + " on"), stat("sb", asleep + " asleep"), stat("", off + " offline"))),
     h("div", { class: "toolbar" }, search, groupChips, h("span", { class: "grow" }),
       h("button", { class: "btn", onclick: () => { const all = list.every(d => S.selected.has(d.id)); list.forEach(d => all ? S.selected.delete(d.id) : S.selected.add(d.id)); renderDevices(); } }, "Select all")),
     ...(bulk ? [bulk] : []), cards);
@@ -342,7 +342,7 @@ function card(d) {
   } else {
     body = h("div", { class: "card-note" }, ic("tv"), d.network === true ? "On the network, but ADB isn't connected. Reconnecting…" : d.last_seen ? `Not reachable. Last seen ${ago(d.last_seen)}.` : d.status === "unknown" ? "Checking connection…" : "Not reachable yet. Check that it's on and on the network.");
   }
-  if (usable(d)) actions = h("div", { class: "btn-group full" }, quick("Wake", "wake"), quick("Standby", "sleep"), quick("Home", "home"));
+  if (usable(d)) actions = h("div", { class: "btn-group full" }, quick("Wake", "wake"), quick("Sleep", "sleep"), quick("Home", "home"));
   else if (d.status !== "unknown") actions = h("div", { class: "btn-group full" },
     h("button", { class: "btn small", onclick: reconnect(d) }, ic("refresh"), d.status === "unauthorized" ? "Try again" : "Reconnect"),
     d.status === "offline" ? wolBtn(d) : null);
@@ -456,7 +456,7 @@ function tabRemote(body, d) {
     if (action === "reboot" && !confirm("Reboot " + d.name + "?")) return;
     const r = await act(d.id, action); toast(r.ok ? msg : r.output, !r.ok); } }, ic("power"), label);
 
-  if (d.status === "asleep") body.append(h("div", { class: "note" }, ic("power"), h("span", { class: "grow" }, "This TV is in standby."),
+  if (d.status === "asleep") body.append(h("div", { class: "note" }, ic("power"), h("span", { class: "grow" }, "This TV is asleep."),
     h("button", { class: "btn small", onclick: async () => { const r = await act(d.id, "wake"); toast(r.ok ? "Wake sent" : r.output, !r.ok); } }, "Wake it")));
   body.append(h("div", { class: "panel" }, h("div", { class: "remote" },
     h("div", { class: "remote-left" },
@@ -473,7 +473,7 @@ function tabRemote(body, d) {
         k([ic("info"), "Info"], "KEYCODE_INFO", "Info", "small"), k([ic("input"), "Input"], "KEYCODE_TV_INPUT", "Input", "small")),
       h("div", { class: "btn-group" },
         k(ic("rewind"), "KEYCODE_MEDIA_REWIND", "Rewind", "small"), k(ic("play"), "KEYCODE_MEDIA_PLAY_PAUSE", "Play/Pause", "small"), k(ic("ff"), "KEYCODE_MEDIA_FAST_FORWARD", "Fast forward", "small")),
-      h("div", { class: "btn-group" }, power("Wake", "wake", "Wake sent"), power("Standby", "sleep", "Standby sent"), power("Reboot", "reboot", "Rebooting…", "danger")),
+      h("div", { class: "btn-group" }, power("Wake", "wake", "Wake sent"), power("Sleep", "sleep", "Sleep sent"), power("Reboot", "reboot", "Rebooting…", "danger")),
       h("label", { class: "row", for: "kbctl", style: "width:100%" }, h("span", { class: "grow" }, "Use keyboard",
         h("span", { class: "sub", style: "display:block" }, "Arrows, Enter, Backspace = Back, H = Home")), kb)),
     h("div", { class: "watch-card" }, h("div", { class: "empty-ic" }, ic("tv")), h("h3", null, "See the screen"),
@@ -746,7 +746,7 @@ function tabSettings(body, d) {
       h("span", { class: "hint" }, d.mac ? (d.mac_auto ? "Learned from the TV. " : "") + "Used to wake the TV over the network when it is fully off. Wi-Fi-only TVs often can't be woken this way; a TV on Ethernet usually can."
         : "Learned automatically while the TV is on. You can also type it here.")),
     h("label", { class: "row", style: "margin-bottom:14px" }, h("span", { class: "grow" }, "Keep this TV on",
-      h("span", { class: "sub", style: "display:block" }, "Turns off the TV's own auto power-off, sleep and no-signal timers, so it stays on until you use Standby or a schedule. Turning this off restores the TV's original timers.")),
+      h("span", { class: "sub", style: "display:block" }, "Turns off the TV's own auto power-off, sleep and no-signal timers, so it stays on until you use Sleep or a schedule. Turning this off restores the TV's original timers.")),
       h("input", { type: "checkbox", class: "switch", role: "switch", checked: d.keep_on, "aria-label": "Keep this TV on", onchange: async e => {
         try { await api("PUT", "/api/devices/" + d.id, { keep_on: e.target.checked }); await loadDevices(); toast(e.target.checked ? "Keeping this TV on" : "TV timers restored"); } catch (x) { e.target.checked = !e.target.checked; toast(x.message, true); } } })),
     h("div", { class: "field" }, h("label", { for: "sg" }, "Group"), group, h("datalist", { id: "grps2" }, S.groups.map(g => h("option", { value: g })))),
@@ -759,7 +759,7 @@ function tabSettings(body, d) {
 
 /* ---------- schedules ---------- */
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const ACTION_LABEL = { wake: "Wake", wol: "Wake over network", sleep: "Standby", reboot: "Reboot", home: "Go Home", input: "Switch input" };
+const ACTION_LABEL = { wake: "Wake", wol: "Wake over network", sleep: "Sleep", reboot: "Reboot", home: "Go Home", input: "Switch input" };
 function fmtTime(t) {
   const [hh, mm] = t.split(":").map(Number), full = new Date(2000, 0, 1, hh, mm).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   const m = /\s?(AM|PM)$/i.exec(full);
@@ -880,7 +880,7 @@ function calendar(windows, now, autoScroll) {
   if (autoScroll) requestAnimationFrame(() => { scroller.scrollTop = Math.max(0, (shown.length ? Math.min(...shown.map(w => mins(w.start))) : 7 * 60) / 60 * HOUR - HOUR); });
   return h("div", { class: "cal" + (shown.length ? "" : " cal-none") }, scroller,
     shown.length ? null : h("div", { class: "cal-hint" }, ic("schedule"), h("div", null, h("b", null, windows.length ? "No schedules for this TV" : "Drag on a day to add a schedule"),
-      h("span", null, "Pick the time the TVs should be on, then choose which TVs. They turn on at the start and go to standby at the end."))));
+      h("span", null, "Pick the time the TVs should be on, then choose which TVs. They turn on at the start and go to sleep at the end."))));
 }
 
 async function renderSchedules(keepScroll) {
@@ -889,7 +889,7 @@ async function renderSchedules(keepScroll) {
   const { schedules, now } = await api("GET", "/api/schedules");
   const windows = schedules.filter(s => s.kind === "window"), legacy = schedules.filter(s => s.kind !== "window");
   const head = h("div", { class: "page-head" }, h("h1", null, "Schedules"),
-    h("p", { class: "sub" }, `Drag on the calendar to choose when TVs should be on. At the start each TV turns on, however it needs to; at the end it goes to standby. Times are the server's clock (${now.zone || "local"}, now ${fmt12(now.time)}).`));
+    h("p", { class: "sub" }, `Drag on the calendar to choose when TVs should be on. At the start each TV turns on, however it needs to; at the end it goes to sleep. Times are the server's clock (${now.zone || "local"}, now ${fmt12(now.time)}).`));
   const filt = h("div", { class: "chips cal-filter", role: "group", "aria-label": "Show schedules for" },
     h("button", { type: "button", class: "chip", "aria-pressed": String(!S.calFilter), onclick: () => { S.calFilter = ""; renderSchedules(true); } }, "All TVs"),
     S.devices.map(d => h("button", { type: "button", class: "chip", "aria-pressed": String(S.calFilter === d.id), onclick: () => { S.calFilter = S.calFilter === d.id ? "" : d.id; renderSchedules(true); } }, d.name)));
@@ -922,7 +922,7 @@ function windowDialog(w, pre) {
     const tv = [...targets].map(tvName);
     summary.textContent = !start.value || !end.value || start.value === end.value ? "Choose a start and end time."
       : !days.size ? "Choose at least one day." : !tv.length ? "Choose at least one TV."
-      : `${tv.length > 2 ? tv.length + " TVs turn" : tv.join(" and ") + (tv.length === 1 ? " turns" : " turn")} on at ${fmt12(start.value)} and ${tv.length === 1 ? "goes" : "go"} to standby at ${fmt12(end.value)}${end.value <= start.value ? " the next day" : ""}, ${dayWords([...days])}.`;
+      : `${tv.length > 2 ? tv.length + " TVs turn" : tv.join(" and ") + (tv.length === 1 ? " turns" : " turn")} on at ${fmt12(start.value)} and ${tv.length === 1 ? "goes" : "go"} to sleep at ${fmt12(end.value)}${end.value <= start.value ? " the next day" : ""}, ${dayWords([...days])}.`;
   };
   const chip = (set, key, label, after) => h("button", { type: "button", class: "chip", "aria-pressed": String(set.has(key)), onclick: e => { set.has(key) ? set.delete(key) : set.add(key); e.currentTarget.setAttribute("aria-pressed", String(set.has(key))); after && after(); update(); } }, label);
   const dayChips = h("div", { class: "chips days" }, DAYS.map((l, i) => chip(days, i, l)));
@@ -937,8 +937,8 @@ function windowDialog(w, pre) {
   update();
   const m = modal(edit ? "Edit schedule" : "New schedule", [
     h("div", { class: "field" }, h("label", { for: "wn" }, "Name"), name),
-    h("div", { class: "grid2" }, h("div", { class: "field" }, h("label", { for: "ws" }, "On at"), start), h("div", { class: "field" }, h("label", { for: "we" }, "Standby at"), end)),
-    h("span", { class: "hint", style: "display:block;margin:-6px 0 14px" }, "If standby is earlier than on, it runs past midnight."),
+    h("div", { class: "grid2" }, h("div", { class: "field" }, h("label", { for: "ws" }, "On at"), start), h("div", { class: "field" }, h("label", { for: "we" }, "Sleep at"), end)),
+    h("span", { class: "hint", style: "display:block;margin:-6px 0 14px" }, "If sleep is earlier than on, it runs past midnight."),
     h("div", { class: "field" }, h("label", null, "Repeat on", h("span", { class: "quick" },
       h("button", { type: "button", class: "btn text small", onclick: () => setDays([0, 1, 2, 3, 4]) }, "Weekdays"), h("button", { type: "button", class: "btn text small", onclick: () => setDays([0, 1, 2, 3, 4, 5, 6]) }, "Every day"))), dayChips),
     h("div", { class: "field" }, h("label", null, "Which TVs"), h("div", { class: "chips" }, allChip, devBtns)),
@@ -990,7 +990,7 @@ function keepalivePanel() {
   draw(-1);
   api("GET", "/api/settings").then(r => draw(r.keepalive)).catch(() => {});
   return h("div", { class: "panel" }, h("h3", null, "Network keepalive"),
-    h("p", { class: "muted", style: "margin-bottom:12px" }, "Sends a tiny message to every TV at this interval. It keeps a TV in standby on the network and reconnects the manager the moment a TV is reachable again. It can't stop a TV that powers itself fully off."),
+    h("p", { class: "muted", style: "margin-bottom:12px" }, "Sends a tiny message to every TV at this interval. It keeps a sleeping TV on the network and reconnects the manager the moment a TV is reachable again. It can't stop a TV that powers itself fully off."),
     h("div", { class: "field", style: "margin-bottom:0" }, h("label", null, "Send every"), group));
 }
 

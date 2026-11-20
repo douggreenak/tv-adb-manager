@@ -78,20 +78,31 @@ Energy saver menu has no "Never" choice and rewrites unknown values to a listed 
 Unplugging the TV, a power cut, or someone long-pressing the remote's power button still turns it off; Wake-on-LAN
 and the keepalive help it back.
 
+## Sleep
+
+**Sleep** (next to **Wake** on every card, in the drawer, in the bulk bar and in schedules) sends the sleep key, which
+puts the TV to sleep with its screen off while its network stays up, so it can be woken again over ADB or Wake-on-LAN.
+It is not the remote's power button, which on these TVs can power the TV fully off. About 25 seconds after every sleep
+the manager checks the TV is still reachable and says so in Activity ("asleep and still on the network"); if the TV
+dropped off the network instead, Activity flags it so you can use **Wake over network**.
+
+At the end of a calendar block every TV that is on, **including one sitting on its screensaver**, is put to sleep. If the
+server was down at the end time, the sleep still happens when it is back up within 10 minutes.
+
 ## Devices
 
-Each card shows the TV's state (**On**, **Standby**, **Offline**, **Needs approval on TV**), model and
+Each card shows the TV's state (**On**, **Asleep**, **Offline**, **Needs approval on TV**), model and
 Android version, the active **Input**, the foreground app (**Showing**), the remembered **Last input**
-and when it was last seen. Quick buttons send Wake, Standby and Home. Click a card for the details drawer.
+and when it was last seen. Quick buttons send Wake, Sleep and Home. Click a card for the details drawer.
 
 Use the search box and group chips to filter. Tick cards (or *Select all*) to get a bulk bar:
-Wake, Standby, Home, Restore input, Reboot.
+Wake, Sleep, Home, Restore input, Reboot.
 
 ## The details drawer
 
 | Tab | What it does |
 |---|---|
-| **Remote** | D-pad, Back/Home/Menu/Info/Input, volume, media keys, Wake/Standby/Reboot. A screenshot panel (refresh or auto-refresh every 3 s). Tick *Use keyboard* to drive it with arrows, Enter, Backspace (Back) and H (Home). |
+| **Remote** | D-pad, Back/Home/Menu/Info/Input, volume, media keys, Wake/Sleep/Reboot. A screenshot panel (refresh or auto-refresh every 3 s). Tick *Use keyboard* to drive it with arrows, Enter, Backspace (Back) and H (Home). |
 | **Inputs** | Every TV input the framework reports, using the names you set on the TV. **Switch** launches it; **Set as power-on** chooses what gets restored. Also the restore switch, *Restore now* and *Forget*. |
 | **Apps** | Installed, disabled, system or all packages with a filter box. Open, Stop, Disable/Enable, Clear data, Remove (uninstall for user 0). |
 | **Install** | Upload an `.apk`; it is installed with `adb install -r`, so existing apps are updated in place. |
@@ -120,7 +131,7 @@ TV is woken: the manager works that out.
 
 - **Draw a block:** drag on a day (or click or tap for one hour). A dialog asks which TVs, which days it repeats
   on (**Weekdays** / **Every day** shortcuts) and an optional name, and writes out what will happen
-  ("Lobby turns on at 9:00 AM and goes to standby at 11:00 AM, Mon–Fri.").
+  ("Lobby turns on at 9:00 AM and goes to sleep at 11:00 AM, Mon–Fri.").
 - **Change a block:** drag it to move it (sideways changes the day), drag its top or bottom edge to resize it,
   or click it to edit, pause (the *Enabled* switch) or delete it. A block that repeats shows on every day and
   changes everywhere at once. Use the TV chips above the calendar to see one TV's schedule. An end earlier than the
@@ -128,7 +139,7 @@ TV is woken: the manager works that out.
 - **At the start** each TV is brought up the way it needs: an asleep or screensaver TV gets a wake key over
   ADB, a fully off TV gets Wake-on-LAN (if its MAC is known). It retries every 30 seconds for 15 minutes and
   Activity says what happened. Once it is up, power-on restore puts it on its last input. A TV that is already on is left alone.
-- **At the end** each TV that is on goes to standby, unless another block covering the same TV is still running
+- **At the end** each TV that is on (including one showing its screensaver) is put to sleep, unless another block covering the same TV is still running
   (so back-to-back blocks don't blink the TV).
 - **Restarts and late edits:** a block that started in the last 10 minutes still counts after a server restart,
   and a block you draw while its time is already running starts straight away. Older blocks aren't re-run.

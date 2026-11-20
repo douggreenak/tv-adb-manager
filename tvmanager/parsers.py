@@ -7,6 +7,12 @@ PASSTHRU = re.compile(r"(hdmi|passthrough|composite|component|vga|scart)", re.I)
 INPUT_STATES = {0: "connected", 1: "standby", 2: "disconnected"}
 
 
+def parse_wakefulness_raw(text):
+    """'Awake', 'Dreaming' (screensaver: screen lit), 'Asleep', 'Dozing', or None."""
+    m = re.search(r"mWakefulness=(\w+)", text or "")
+    return m.group(1) if m else None
+
+
 def parse_wakefulness(text):
     """True awake, False asleep/dozing, None if unknown."""
     m = re.search(r"mWakefulness=(\w+)", text or "")

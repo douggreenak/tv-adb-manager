@@ -133,3 +133,37 @@ class FleetTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ScheduledSleepTests(FleetTests):
+    """A calendar block ends -> the real scheduler + real App actions put the simulated TV to sleep, and it stays reachable."""
+
+    def setUp(self):
+        super().setUp()
+        from tvmanager.server import App
+        self.app = App(os.path.join(self.tmp.name, "app"), os.path.join(ROOT, "web"), adb=self.adb, env_password="pw", poll=60, start_threads=False)
+        self.app.store = self.store
+        self.app.monitor = self.mon
+        self.app.events = self.events
+        self.app.scheduler.store, self.app.scheduler.events = self.store, self.events
+        self.app.keepalive.store, self.app.keepalive.monitor, self.app.keepalive.events = self.store, self.mon, self.events
+
+    def test_end_of_block_sleeps_the_tv_and_it_stays_reachable(self):
+        import tvmanager.scheduler as sch
+        self.poll(settle=True)
+        self.assertEqual(self.mon.snapshot(self.ids[A])["status"], "online")
+        sc = self.app.scheduler
+        self.store.save_schedule(dict(kind="window", id="w1", name="Day", start="07:00", end="17:00", days=[0, 1, 2, 3, 4, 5, 6],
+                                      targets=[self.ids[A]], enabled=True, updated=0))
+        end = time.mktime((2026, 11, 16, 17, 0, 0, 0, 0, -1))
+        sc.tick(time.localtime(end), end)
+        self.poll()
+        self.assertEqual(self.mon.snapshot(self.ids[A])["status"], "asleep")                 # slept, but ADB still connected
+        self.assertEqual(self.adb.devices().get(A), "device")
+        self.app.verify_sleep(self.store.device(self.ids[A]), wait=0)
+        for _ in range(50):
+            if any("still on the network" in e["msg"] for e in self.events.list()):
+                break
+            time.sleep(0.05)
+        self.assertTrue(any("asleep and still on the network" in e["msg"] for e in self.events.list()), [e["msg"] for e in self.events.list()])
+        self.assertTrue(any("ended: sleep" in e["msg"] or "ended: standby" in e["msg"] for e in self.events.list()))

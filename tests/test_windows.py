@@ -3,7 +3,7 @@ import tempfile
 import time
 import unittest
 
-from tvmanager.scheduler import Scheduler, duration, ends_now, occurrences, validate
+from tvmanager.scheduler import Scheduler, duration, minutes_since_end, occurrences, validate
 from tvmanager.store import EventLog, Store
 
 MON = 0
@@ -36,9 +36,10 @@ class MathTests(unittest.TestCase):
         night = win(start="22:00", end="06:00", days=[4])                         # Friday night
         self.assertEqual(list(occurrences(night, now(5, 3, 0))), [300])           # still running Saturday 3am
         self.assertEqual(list(occurrences(night, now(6, 3, 0))), [])
-        self.assertTrue(ends_now(night, now(5, 6, 0)))
-        self.assertTrue(ends_now(win(), now(MON, 17, 0)))
-        self.assertFalse(ends_now(win(), now(MON, 17, 1)))
+        self.assertEqual(minutes_since_end(night, now(5, 6, 0)), 0)
+        self.assertEqual(minutes_since_end(win(), now(MON, 17, 0)), 0)
+        self.assertEqual(minutes_since_end(win(), now(MON, 17, 7)), 7)
+        self.assertGreater(minutes_since_end(win(), now(MON, 18, 0)), 10)
 
     def test_validate(self):
         ok = validate({"kind": "window", "start": "7:30", "end": "17:00", "targets": ["a"], "days": [0, 6]})
@@ -116,6 +117,36 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(self.calls, [(self.a["id"], "sleep")])
         self.sched.tick(lt(MON, 17, 0, 15))
         self.assertEqual(len(self.calls), 1)                                  # once per minute
+
+    def test_end_also_sleeps_a_tv_showing_its_screensaver(self):
+        self.add()
+        self.status[self.a["id"]] = "dreaming"                              # screen is lit, just on the screensaver
+        self.sched.tick(lt(MON, 17, 0))
+        self.assertEqual(self.calls, [(self.a["id"], "sleep")])
+
+    def test_start_treats_screensaver_as_not_on_and_wakes_it(self):
+        self.add()
+        self.status[self.a["id"]] = "dreaming"
+        self.sched.tick(lt(MON, 7, 0))
+        self.assertEqual(self.calls, [(self.a["id"], "wake")])              # wake key dismisses it; the monitor restores the input
+
+    def test_end_is_caught_up_after_a_restart_but_not_hours_later(self):
+        self.add()
+        self.status[self.a["id"]] = "online"
+        self.sched.tick(lt(MON, 17, 6))                                      # server was down at 17:00, back at 17:06
+        self.assertEqual(self.calls, [(self.a["id"], "sleep")])
+        self.calls.clear()
+        self.sched.tick(lt(MON, 17, 8))
+        self.assertEqual(self.calls, [])                                     # only once
+        self.sched.tick(lt(MON, 20, 0))
+        self.assertEqual(self.calls, [])                                     # three hours later: leave it alone
+
+    def test_block_drawn_after_it_ended_does_not_sleep_the_tv(self):
+        self.status[self.a["id"]] = "online"
+        s = win(targets=[self.a["id"]], start="09:00", end="10:00", updated=time.mktime(lt(MON, 10, 2)))
+        self.store.save_schedule(s)
+        self.sched.tick(lt(MON, 10, 3))
+        self.assertEqual(self.calls, [])
 
     def test_overlapping_window_keeps_it_on(self):
         self.add()

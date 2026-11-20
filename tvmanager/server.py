@@ -43,7 +43,7 @@ class App:
         self.auth = Auth(data_dir, env_password, log=lambda m: print(m, flush=True))
         self.monitor = Monitor(self.adb, self.store, self.events, poll=poll)
         self.scheduler = Scheduler(self.store, self.events, self.run_action,
-                                   get_status=lambda dev: (self.monitor.snapshot(dev["id"]) or {}).get("status"))
+                                   get_status=self.sched_status)
         self.keepalive = KeepAlive(self.store, self.monitor, self.events)
         self.live = livemod.LiveManager()
         self.started = time.time()
@@ -85,6 +85,29 @@ class App:
         rc, out = self.adb.shell(dev["addr"], "input keyevent %s" % keycode)
         return rc == 0, out.strip()
 
+    def sched_status(self, dev):
+        """Status for the scheduler: like the monitor's, but a TV on its screensaver is 'dreaming' (its screen is lit)."""
+        st = self.monitor.snapshot(dev["id"]) or {}
+        status = st.get("status")
+        return "dreaming" if status == "asleep" and st.get("wakefulness") == "Dreaming" else status
+
+    def verify_sleep(self, dev, wait=25):
+        """After a sleep, confirm the TV is still reachable. A TV that dropped off the network went fully off."""
+        def check():
+            time.sleep(wait)
+            d = self.store.device(dev["id"])
+            if not d:
+                return
+            st = self.monitor.snapshot(d["id"]) or {}
+            net = self.keepalive.view(d["id"]) or {}
+            if st.get("status") == "asleep":
+                self.events.add(d["name"], "asleep and still on the network")
+            elif st.get("status") == "online":
+                self.events.add(d["name"], "did not go to sleep (it is still on)", "error")
+            elif net.get("up") is False or st.get("status") == "offline":
+                self.events.add(d["name"], "went fully off instead of sleeping. It is off the network now; use Wake over network", "error")
+        threading.Thread(target=check, daemon=True, name="verify-sleep").start()
+
     def wake_on_lan(self, dev):
         st = self.monitor.snapshot(dev["id"]) or {}
         mac = dev.get("mac") or st.get("mac")
@@ -106,7 +129,10 @@ class App:
                 return self.wake_on_lan(dev)          # fully off: ADB can't reach it, so use the network
             return self.key(dev, "KEYCODE_WAKEUP")
         if action == "sleep":
-            return self.key(dev, "KEYCODE_SLEEP")
+            ok, out = self.key(dev, "KEYCODE_SLEEP")
+            if ok:
+                self.verify_sleep(dev)
+            return ok, out
         if action in BASE_KEYS:
             return self.key(dev, BASE_KEYS[action])
         if action == "reboot":

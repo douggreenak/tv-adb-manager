@@ -66,7 +66,7 @@ class FireTVTests(unittest.TestCase):
         st["status"] = "online"
         self.assertTrue(self.app.run_action(dev, "sleep")[0])
         self.assertEqual(self.tv.calls[-1][1], "/v1/FireTV?action=sleep")
-        self.assertEqual(self.app.monitor.snapshot(dev["id"])["status"], "asleep")
+        self.assertEqual(self.app.monitor.snapshot(dev["id"])["status"], "online")      # never shown as asleep
         self.assertTrue(self.app.run_action(dev, "wake")[0])
         self.assertEqual(self.tv.calls[-1][1], "/v1/FireTV?action=wakeup")
         self.assertEqual(self.app.monitor.snapshot(dev["id"])["status"], "online")

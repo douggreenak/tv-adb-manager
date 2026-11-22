@@ -246,6 +246,7 @@ input[type=checkbox]:not(.switch):checked::after { opacity: 1; transform: none; 
   font-weight: 700; white-space: nowrap; background: var(--surface-highest); color: var(--on-surface-variant); }
 .status .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
 .s-online { background: var(--ok-c); color: var(--on-ok); }
+.s-reachable { background: var(--surface-2, rgba(128,128,128,.18)); color: inherit; }
 .s-asleep { background: var(--warn-c); color: var(--on-warn); }
 .s-unauthorized { background: var(--primary-container); color: var(--on-primary-container); }
 

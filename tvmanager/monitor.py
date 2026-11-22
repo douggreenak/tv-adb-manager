@@ -202,24 +202,21 @@ class Monitor:
             self._restore(dev, st, inp, top)
 
     def firetv_cycle(self, dev, st, now):
-        """A Fire TV has no ADB: it is 'on' or 'asleep' by what the manager last sent it, and 'offline' if it
-        does not answer on the network. (It cannot report its own wakefulness.)"""
+        """A Fire TV has no ADB and cannot report whether it is on, so it is 'online' (reachable on the network,
+        which includes asleep) or 'offline'. The UI shows it as 'On the network', never as on or asleep."""
         st.update(manufacturer="Amazon", model="Fire TV", android=None)
         if not dev.get("token"):
             self._set_status(st, dev["name"], "unauthorized", quiet=True)
             return
         if net_probe(dev["addr"], timeout=2.0):
             st.update(last_seen=now, seen_online=True)
-            self._set_status(st, dev["name"], "asleep" if st.get("assumed_sleep") else "online", quiet=True)
+            self._set_status(st, dev["name"], "online", quiet=True)
         else:
             self._set_status(st, dev["name"], "offline", quiet=True)
 
     def assume_sleep(self, dev_id, asleep):
-        """Remember what we last told a Fire TV to do."""
-        st = self._st(dev_id)
-        st["assumed_sleep"] = asleep
-        if st["status"] in ("online", "asleep"):
-            st["status"] = "asleep" if asleep else "online"
+        """Remember what we last told a Fire TV to do (not shown as its state)."""
+        self._st(dev_id)["assumed_sleep"] = asleep
 
     def keep_on(self, dev, st, force=False):
         """Make sure the TV's own power-off and sleep timers are off (unless turned off for this TV)."""

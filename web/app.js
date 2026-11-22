@@ -266,8 +266,9 @@ const byId = id => S.devices.find(d => d.id === id);
 
 /* ---------- devices view ---------- */
 function statusEl(d) {
-  const t = d.kind === "firetv" && d.status === "unauthorized" ? "Needs pairing" : STATUS_TEXT[d.status] || d.status;
-  return h("span", { class: "status s-" + d.status }, h("i", { class: "dot" }), t);
+  const ftvUp = d.kind === "firetv" && usable(d);          // a Fire TV can't report on/asleep: only whether it is reachable
+  const t = d.kind === "firetv" && d.status === "unauthorized" ? "Needs pairing" : ftvUp ? "On the network" : STATUS_TEXT[d.status] || d.status;
+  return h("span", { class: "status s-" + (ftvUp ? "reachable" : d.status) }, h("i", { class: "dot" }), t);
 }
 
 function renderDevices() {
@@ -282,9 +283,10 @@ function renderDevices() {
   const q = S.filter.toLowerCase();
   const list = S.devices.filter(d => (!S.group || d.group === S.group) &&
     (!q || [d.name, d.addr, d.model, d.group].some(x => (x || "").toLowerCase().includes(q))));
-  const online = S.devices.filter(d => d.status === "online").length;
-  const asleep = S.devices.filter(d => d.status === "asleep").length;
-  const off = S.devices.length - online - asleep;
+  const adbDevs = S.devices.filter(d => d.kind !== "firetv");        // a Fire TV can't say whether it is on
+  const online = adbDevs.filter(d => d.status === "online").length;
+  const asleep = adbDevs.filter(d => d.status === "asleep").length;
+  const off = adbDevs.length - online - asleep;
 
   // keep search box focus across live re-renders
   const prev = $("#search"); const keepFocus = prev && document.activeElement === prev; const caret = prev && prev.selectionStart;
@@ -342,8 +344,7 @@ function card(d) {
     body = h("div", { class: "card-note" }, ic("lock"), "Pair this Fire TV: a PIN appears on the TV and you type it here.");
     actions = h("div", { class: "btn-group full" }, h("button", { class: "btn small primary", onclick: e => { e.stopPropagation(); pairDialog(d); } }, "Pair"));
   } else if (ftv && usable(d)) {
-    body = h("dl", null, row("Model", "Amazon Fire TV"), row("State", d.status === "asleep" ? "Asleep (last command)" : "On (last command)",
-      "A Fire TV can't report whether it is on. This shows what the manager last sent it."), row("Last seen", ago(d.last_seen)));
+    body = h("dl", null, row("Model", "Amazon Fire TV"), row("Last seen", ago(d.last_seen)));
   } else if (d.status === "online") {
     body = h("dl", null, row("Model", model), row("Showing", d.input_name || appName(d.top) || "–", d.top), row("Power-on input", powerOn(d)));
   } else if (d.status === "asleep") {

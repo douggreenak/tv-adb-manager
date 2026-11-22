@@ -158,7 +158,7 @@ class Scheduler:
             if not dev:
                 del self.pending[dev_id]
                 continue
-            if self.get_status(dev) == "online":
+            if self.get_status(dev) == "online" and (dev.get("kind") != "firetv" or job["tries"]):   # a Fire TV can't report being on, so always send the wake once
                 self.events.add(dev["name"], "schedule '%s': TV is on%s" % (job["label"], "" if job["tries"] else " already"))
                 del self.pending[dev_id]
             elif now_ts >= job["until"]:

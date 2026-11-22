@@ -89,6 +89,14 @@ dropped off the network instead, Activity flags it so you can use **Wake over ne
 At the end of a calendar block every TV that is on, **including one sitting on its screensaver**, is put to sleep. If the
 server was down at the end time, the sleep still happens when it is back up within 10 minutes.
 
+## Fire TV (no ADB)
+
+Fire TVs don't offer ADB, so they are added with **Add device → Fire TV** and paired once: the manager shows a 4-digit PIN on the TV and you type it in. After that the card has Wake, Sleep and Home, the Remote tab works (arrows, OK, back, home, play/pause), and calendar schedules wake and sleep it like any other TV. The manager uses the local API the Fire TV phone remote app uses (HTTPS on port 8080, started through port 8009); the pairing token is stored in `data/devices.json`.
+
+- A Fire TV can't report whether it is on, so its status is what the manager last sent it ("On / Asleep (last command)"). A schedule always sends the wake once at the start of a block.
+- Sleep keeps it on the network. The keepalive probes port 8009.
+- Not available: screen view, inputs, apps, install, shell, keep-on, Wake-on-LAN. If the TV stops responding, use **Settings → Pair again**.
+
 ## Devices
 
 Each card shows the TV's state (**On**, **Asleep**, **Offline**, **Needs approval on TV**), model and

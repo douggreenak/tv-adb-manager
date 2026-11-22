@@ -27,7 +27,8 @@ curl -b jar -H 'X-Requested-With: tvm' -H 'Content-Type: application/json' \
 |---|---|---|
 | `GET /api/settings`, `PUT /api/settings` | `{keepalive: seconds, 0 = off, 2-300}` | server settings; devices also report `network` (true/false/null) |
 | `GET /api/devices` | | `{devices:[…], groups:[…]}`; each device has `id, name, addr, group, status, awake, input, input_name, top, model, manufacturer, android, last_seen, mac, keep_on, restore:{enabled,last,last_name}` |
-| `POST /api/devices` | `{name?, addr, group}` | 201 with the device; `addr` defaults to port 5555; an empty `name` follows the TV's own name |
+| `POST /api/devices/<id>/pair` | `{}` shows a PIN on a Fire TV; `{pin}` verifies it and stores the token | `{ok, output}` |
+| `POST /api/devices` | `{name?, addr, group, kind?: "adb"\|"firetv"}` | 201 with the device; `addr` defaults to port 5555; an empty `name` follows the TV's own name |
 | `PUT /api/devices/<id>` (also `{keep_on: bool}`) | any of `name, addr, group, restore:{enabled,last}` | updated device |
 | `DELETE /api/devices/<id>` | | |
 | `GET /api/devices/<id>/info` | | props, `storage_kb`, `memory_kb`, `uptime_s`, `ip` |

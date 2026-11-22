@@ -83,8 +83,11 @@ class Store:
                     return dict(d)
         return None
 
-    def add_device(self, name, addr, group=""):
-        addr = normalize_addr(addr)
+    def add_device(self, name, addr, group="", kind="adb"):
+        if kind == "firetv":
+            addr = normalize_addr(addr.split(":")[0] + ":8009" if addr else addr)     # probed on its remote-service port
+        else:
+            addr = normalize_addr(addr)
         with self.lock:
             if any(d["addr"] == addr for d in self._devices):
                 raise ValueError("a device with that address already exists")
@@ -94,6 +97,8 @@ class Store:
                  "auto_name": (not name) or name in (addr, host),     # blank: take the TV's own name once it is known
                  "group": (group or "").strip()[:40],
                  "restore": {"enabled": True, "last": None}}
+            if kind == "firetv":
+                d.update(kind="firetv", keep_on=False, token="")
             self._devices.append(d)
             self._save("devices.json", self._devices)
             return dict(d)
@@ -111,7 +116,7 @@ class Store:
                     if "mac" in fields and fields["mac"] is not None:
                         d["mac"] = normalize_mac(fields["mac"])
                         d["mac_auto"] = False                           # typed by the user: don't overwrite
-                    for k in ("keep_on", "keep_on_prev"):
+                    for k in ("keep_on", "keep_on_prev", "token"):
                         if k in fields:
                             d[k] = fields[k]
                     for k in ("name", "addr", "group", "restore"):

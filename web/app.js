@@ -179,6 +179,9 @@ const wolBtn = (d, cls) => h("button", { class: "btn " + (cls || "small"), title
   disabled: !d.mac, onclick: async e => { e.stopPropagation(); try { const r = await act(d.id, "wol"); toast(r.output, !r.ok); } catch (x) { toast(x.message, true); } } }, ic("power"), "Wake over network");
 
 function unavailable(d, what) {
+  if (d.kind === "firetv" && d.status === "unauthorized") return h("div", { class: "panel empty-panel" }, h("div", { class: "empty-ic" }, ic("lock")),
+    h("h3", null, "Needs pairing"), h("p", { class: "muted" }, "Pair this Fire TV with the PIN shown on its screen."),
+    h("div", { class: "keys" }, h("button", { class: "btn primary", onclick: () => pairDialog(d) }, "Pair")));
   const un = d.status === "unauthorized", checking = d.status === "unknown";
   return h("div", { class: "panel empty-panel" }, h("div", { class: "empty-ic" }, ic(un ? "lock" : "tv")),
     h("h3", null, un ? "Waiting for approval" : checking ? "Checking…" : "TV is offline"),
@@ -263,7 +266,8 @@ const byId = id => S.devices.find(d => d.id === id);
 
 /* ---------- devices view ---------- */
 function statusEl(d) {
-  return h("span", { class: "status s-" + d.status }, h("i", { class: "dot" }), STATUS_TEXT[d.status] || d.status);
+  const t = d.kind === "firetv" && d.status === "unauthorized" ? "Needs pairing" : STATUS_TEXT[d.status] || d.status;
+  return h("span", { class: "status s-" + d.status }, h("i", { class: "dot" }), t);
 }
 
 function renderDevices() {
@@ -333,7 +337,14 @@ function card(d) {
   const row = (k, v, title) => [h("dt", null, k), h("dd", { title: title || null }, v)];
   const model = [[d.manufacturer, d.model].filter(Boolean).join(" ") || "–", d.android ? ` · Android ${d.android}` : ""].join("");
   let body, actions;
-  if (d.status === "online") {
+  const ftv = d.kind === "firetv";
+  if (ftv && d.status === "unauthorized") {
+    body = h("div", { class: "card-note" }, ic("lock"), "Pair this Fire TV: a PIN appears on the TV and you type it here.");
+    actions = h("div", { class: "btn-group full" }, h("button", { class: "btn small primary", onclick: e => { e.stopPropagation(); pairDialog(d); } }, "Pair"));
+  } else if (ftv && usable(d)) {
+    body = h("dl", null, row("Model", "Amazon Fire TV"), row("State", d.status === "asleep" ? "Asleep (last command)" : "On (last command)",
+      "A Fire TV can't report whether it is on. This shows what the manager last sent it."), row("Last seen", ago(d.last_seen)));
+  } else if (d.status === "online") {
     body = h("dl", null, row("Model", model), row("Showing", d.input_name || appName(d.top) || "–", d.top), row("Power-on input", powerOn(d)));
   } else if (d.status === "asleep") {
     body = h("dl", null, row("Model", model), row("Power-on input", powerOn(d)), row("Last seen", ago(d.last_seen)));
@@ -342,7 +353,9 @@ function card(d) {
   } else {
     body = h("div", { class: "card-note" }, ic("tv"), d.network === true ? "On the network, but ADB isn't connected. Reconnecting…" : d.last_seen ? `Not reachable. Last seen ${ago(d.last_seen)}.` : d.status === "unknown" ? "Checking connection…" : "Not reachable yet. Check that it's on and on the network.");
   }
-  if (usable(d)) actions = h("div", { class: "btn-group full" }, quick("Wake", "wake"), quick("Sleep", "sleep"), quick("Home", "home"));
+  if (actions) { /* Fire TV pairing button */ }
+  else if (usable(d)) actions = h("div", { class: "btn-group full" }, quick("Wake", "wake"), quick("Sleep", "sleep"), quick("Home", "home"));
+  else if (ftv) actions = null;
   else if (d.status !== "unknown") actions = h("div", { class: "btn-group full" },
     h("button", { class: "btn small", onclick: reconnect(d) }, ic("refresh"), d.status === "unauthorized" ? "Try again" : "Reconnect"),
     d.status === "offline" ? wolBtn(d) : null);
@@ -369,22 +382,41 @@ function modal(title, bodyEls, buttons) {
   return m;
 }
 
+function pairDialog(d) {
+  const pin = h("input", { type: "text", id: "pp", inputmode: "numeric", maxlength: "4", autocomplete: "off", placeholder: "4-digit PIN" });
+  const err = h("p", { class: "hint err", role: "alert" });
+  const show = async () => { err.textContent = ""; try { await api("POST", "/api/devices/" + d.id + "/pair", {}); toast("A PIN is showing on the TV"); pin.focus(); } catch (e) { err.textContent = e.message; } };
+  const verify = async () => { err.textContent = "";
+    try { await api("POST", "/api/devices/" + d.id + "/pair", { pin: pin.value }); m.close(); toast("Paired"); await loadDevices(); refresh(); }
+    catch (e) { err.textContent = e.message; pin.select(); } };
+  pin.addEventListener("keydown", e => { if (e.key === "Enter") verify(); });
+  const m = modal("Pair " + d.name, [
+    h("p", { class: "muted", style: "font-size:13.5px;margin-bottom:12px" }, "Wake the Fire TV, press Show PIN, then type the 4-digit code from the TV screen."),
+    h("button", { class: "btn", onclick: show }, "Show PIN on the TV"),
+    h("div", { class: "field", style: "margin-top:14px" }, h("label", { for: "pp" }, "PIN"), pin, err)], [
+    h("button", { class: "btn text", onclick: () => m.close() }, "Cancel"),
+    h("button", { class: "btn primary", onclick: verify }, "Pair")]);
+}
+
 function addDeviceDialog() {
+  const kind = h("select", { id: "ak" }, h("option", { value: "adb" }, "Android TV (uses ADB)"), h("option", { value: "firetv" }, "Fire TV (no ADB, pairs with a PIN)"));
   const name = h("input", { type: "text", id: "an", placeholder: "Leave empty to use the TV's own name", autocomplete: "off" });
   const addr = h("input", { type: "text", id: "aa", placeholder: "192.168.1.50", autocomplete: "off", inputmode: "decimal" });
   const group = h("input", { type: "text", id: "ag", placeholder: "Optional, e.g. Lobby", list: "grps", autocomplete: "off" });
   const addrErr = h("p", { class: "hint err", role: "alert" });
   const submit = async () => {
     addrErr.textContent = ""; addr.removeAttribute("aria-invalid");
-    try { await api("POST", "/api/devices", { name: name.value, addr: addr.value, group: group.value }); m.close(); toast("Device added"); refresh(); }
+    try { const nd = await api("POST", "/api/devices", { name: name.value, addr: addr.value, group: group.value, kind: kind.value }); m.close(); toast("Device added"); await refresh();
+      if (kind.value === "firetv") pairDialog(nd); }
     catch (e) { addrErr.textContent = e.message; addr.setAttribute("aria-invalid", "true"); addr.focus(); }
   };
   [name, addr, group].forEach(i => i.addEventListener("keydown", e => { if (e.key === "Enter") submit(); }));
   const m = modal("Add device", [
+    h("div", { class: "field" }, h("label", { for: "ak" }, "Type"), kind),
     h("div", { class: "field" }, h("label", { for: "an" }, "Name (optional)"), name),
     h("div", { class: "field" }, h("label", { for: "aa" }, "IP address"), addr, h("span", { class: "hint" }, "Port 5555 is used unless you add one, like 192.168.1.50:5556."), addrErr),
     h("div", { class: "field" }, h("label", { for: "ag" }, "Group"), group, h("datalist", { id: "grps" }, S.groups.map(g => h("option", { value: g })))),
-    h("p", { class: "muted", style: "font-size:13.5px" }, "ADB debugging (network) must be on in the TV's Developer options. The first connection asks you to approve this server on the TV screen.")], [
+    h("p", { class: "muted", style: "font-size:13.5px" }, "Android TV: ADB debugging (network) must be on in the TV's Developer options, and the first connection asks you to approve this server on the TV screen. Fire TV: no setup; after adding it you pair with a PIN shown on the TV.")], [
     h("button", { class: "btn text", onclick: () => m.close() }, "Cancel"),
     h("button", { class: "btn primary", onclick: submit }, "Add")]);
 }
@@ -423,7 +455,9 @@ function updateDrawerHead() {
   if (u !== S.drawerUsable) { S.drawerUsable = u; if (S.tab !== "settings") { runCleanups(); renderTab(); } }
 }
 function renderTabs() {
-  $("#dtabs").replaceChildren(...TABS.map(([k, l]) => h("button", { role: "tab", "aria-selected": String(S.tab === k),
+  const dd = byId(S.open);
+  if (dd?.kind === "firetv" && !["remote", "settings"].includes(S.tab)) S.tab = "remote";
+  $("#dtabs").replaceChildren(...TABS.filter(([k]) => dd?.kind !== "firetv" || ["remote", "settings"].includes(k)).map(([k, l]) => h("button", { role: "tab", "aria-selected": String(S.tab === k),
     onclick: () => { S.tab = k; runCleanups(); renderTabs(); renderTab(); } }, l)));
 }
 function renderTab() {
@@ -742,17 +776,20 @@ function tabSettings(body, d) {
         : d.tv_name ? h("span", { class: "hint" }, `Name on the TV: ${d.tv_name} `, h("button", { class: "btn text small", type: "button", onclick: async () => {
             try { await api("PUT", "/api/devices/" + d.id, { auto_name: true }); await loadDevices(); updateDrawerHead(); renderTab(); toast("Using the TV's name"); } catch (e) { toast(e.message, true); } } }, "Use it")) : null),
     h("div", { class: "field" }, h("label", { for: "sa" }, "Address"), addr),
-    h("div", { class: "field" }, h("label", { for: "sm" }, "MAC address (for Wake-on-LAN)"), mac,
+    d.kind === "firetv" ? h("div", { class: "field" }, h("label", null, "Pairing"),
+      h("span", { class: "hint" }, d.paired ? "Paired. Pair again if the TV stops responding to commands." : "Not paired yet."),
+      h("button", { class: "btn", type: "button", onclick: () => pairDialog(d) }, d.paired ? "Pair again" : "Pair")) : null,
+    d.kind === "firetv" ? null : h("div", { class: "field" }, h("label", { for: "sm" }, "MAC address (for Wake-on-LAN)"), mac,
       h("span", { class: "hint" }, d.mac ? (d.mac_auto ? "Learned from the TV. " : "") + "Used to wake the TV over the network when it is fully off. Wi-Fi-only TVs often can't be woken this way; a TV on Ethernet usually can."
         : "Learned automatically while the TV is on. You can also type it here.")),
-    h("label", { class: "row", style: "margin-bottom:14px" }, h("span", { class: "grow" }, "Keep this TV on",
+    d.kind === "firetv" ? null : h("label", { class: "row", style: "margin-bottom:14px" }, h("span", { class: "grow" }, "Keep this TV on",
       h("span", { class: "sub", style: "display:block" }, "Turns off the TV's own auto power-off, sleep and no-signal timers, so it stays on until you use Sleep or a schedule. Turning this off restores the TV's original timers.")),
       h("input", { type: "checkbox", class: "switch", role: "switch", checked: d.keep_on, "aria-label": "Keep this TV on", onchange: async e => {
         try { await api("PUT", "/api/devices/" + d.id, { keep_on: e.target.checked }); await loadDevices(); toast(e.target.checked ? "Keeping this TV on" : "TV timers restored"); } catch (x) { e.target.checked = !e.target.checked; toast(x.message, true); } } })),
     h("div", { class: "field" }, h("label", { for: "sg" }, "Group"), group, h("datalist", { id: "grps2" }, S.groups.map(g => h("option", { value: g })))),
     h("div", { class: "keys" },
       h("button", { class: "btn primary", onclick: async () => { try { await api("PUT", "/api/devices/" + d.id, { name: name.value, addr: addr.value, group: group.value, mac: mac.value }); await loadDevices(); updateDrawerHead(); renderTab(); toast("Saved"); } catch (e) { toast(e.message, true); } } }, "Save"),
-      h("button", { class: "btn", onclick: async () => { const r = await act(d.id, "connect"); toast(r.output || (r.ok ? "Connected" : "Failed"), !r.ok); } }, ic("refresh"), "Reconnect ADB"))),
+      d.kind === "firetv" ? null : h("button", { class: "btn", onclick: async () => { const r = await act(d.id, "connect"); toast(r.output || (r.ok ? "Connected" : "Failed"), !r.ok); } }, ic("refresh"), "Reconnect ADB"))),
     h("div", { class: "panel" }, h("h3", null, "Remove"), h("p", { class: "muted", style: "margin-bottom:12px" }, "Removes this TV from the manager. Nothing on the TV changes."),
       h("button", { class: "btn danger", onclick: async () => { if (confirm("Remove " + d.name + " from the manager?")) { await api("DELETE", "/api/devices/" + d.id); closeDrawer(); S.selected.delete(d.id); toast("Removed"); refresh(); } } }, "Remove device")));
 }

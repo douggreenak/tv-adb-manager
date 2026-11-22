@@ -16,6 +16,7 @@ from .adb import Adb
 from .auth import Auth
 from . import live as livemod
 from . import wol
+from . import firetv as firetvmod
 from .keepalive import KeepAlive, clamp as clamp_keepalive
 from .monitor import Monitor, launch_input
 from .scheduler import Scheduler, validate as validate_schedule
@@ -34,10 +35,11 @@ class ApiError(Exception):
 
 
 class App:
-    def __init__(self, data_dir, web_dir, adb=None, env_password=None, poll=3.0, start_threads=True):
+    def __init__(self, data_dir, web_dir, adb=None, env_password=None, poll=3.0, start_threads=True, firetv=None):
         self.data_dir, self.web_dir = data_dir, web_dir
         os.makedirs(data_dir, exist_ok=True)
         self.adb = adb or Adb()
+        self.firetv = firetv or firetvmod.FireTV()
         self.store = Store(data_dir)
         self.events = EventLog(data_dir)
         self.auth = Auth(data_dir, env_password, log=lambda m: print(m, flush=True))
@@ -63,7 +65,7 @@ class App:
             "auto_name": d.get("auto_name", False), "tv_name": st.get("tv_name"),
             "restore": {"enabled": (d.get("restore") or {}).get("enabled", True), "last": last,
                         "last_name": P.short_input_name(last, labels) if last else None},
-            "keep_on": d.get("keep_on", True),
+            "keep_on": d.get("keep_on", True), "kind": d.get("kind", "adb"), "paired": bool(d.get("token")),
             "network": (self.keepalive.view(d["id"]) or {}).get("up"),
             "mac": d.get("mac") or st.get("mac") or "", "mac_auto": d.get("mac_auto", True),
             "status": st.get("status", "unknown"), "awake": st.get("awake"),
@@ -78,10 +80,23 @@ class App:
             raise ApiError(404, "unknown device")
         return d
 
+    def require_adb_device(self, dev_id):
+        d = self.require_device(dev_id)
+        if d.get("kind") == "firetv":
+            raise ApiError(400, "Not available on a Fire TV (it has no ADB). Use Wake, Sleep and the Remote.")
+        return d
+
     # ---- actions shared by API, bulk, scheduler --------------------------
     def key(self, dev, keycode):
         if not P.SAFE_KEY.match(str(keycode)):
             raise ApiError(400, "invalid key")
+        if dev.get("kind") == "firetv":
+            ok, out = self.firetv.press(dev["addr"].split(":")[0], dev.get("token"), str(keycode))
+            if ok and keycode == "KEYCODE_SLEEP":
+                self.monitor.assume_sleep(dev["id"], True)
+            elif ok and keycode == "KEYCODE_WAKEUP":
+                self.monitor.assume_sleep(dev["id"], False)
+            return ok, out
         rc, out = self.adb.shell(dev["addr"], "input keyevent %s" % keycode)
         return rc == 0, out.strip()
 
@@ -118,9 +133,24 @@ class App:
             return False, "Could not send the Wake-on-LAN packet from this server."
         return True, "Sent Wake-on-LAN to %s. A TV that is fully off may not respond; standby usually does." % mac
 
+    def run_firetv_action(self, dev, action):
+        if action == "wake":
+            return self.key(dev, "KEYCODE_WAKEUP")
+        if action == "sleep":
+            return self.key(dev, "KEYCODE_SLEEP")
+        if action in BASE_KEYS:
+            return self.key(dev, BASE_KEYS[action])
+        if action == "connect":
+            st = self.monitor.snapshot(dev["id"]) or {}
+            up = firetvmod.FireTV.start_service(self.firetv, dev["addr"].split(":")[0])
+            return up, "Fire TV remote service started" if up else "The Fire TV did not answer"
+        return False, "Not available on a Fire TV"
+
     def run_action(self, dev, action, args=None):
         args = args or {}
         addr = dev["addr"]
+        if dev.get("kind") == "firetv":
+            return self.run_firetv_action(dev, action)
         if action == "wol":
             return self.wake_on_lan(dev)
         if action == "wake":
@@ -323,8 +353,11 @@ def r_devices(h, m, q):
 @route("POST", "/api/devices")
 def r_add_device(h, m, q):
     b = h._json_body()
-    d = h.app.store.add_device(b.get("name"), b.get("addr"), b.get("group"))
-    h.app.events.add(d["name"], "device added (%s)" % d["addr"])
+    kind = b.get("kind", "adb")
+    if kind not in ("adb", "firetv"):
+        raise ApiError(400, "unknown device kind")
+    d = h.app.store.add_device(b.get("name"), b.get("addr"), b.get("group"), kind)
+    h.app.events.add(d["name"], "device added (%s)%s" % (d["addr"], " as a Fire TV" if kind == "firetv" else ""))
     h._send(201, h.app.device_view(d))
 
 
@@ -334,6 +367,10 @@ def r_update_device(h, m, q):
     d = a.require_device(m.group(1))
     b = h._json_body()
     fields = {k: b[k] for k in ("name", "addr", "group", "auto_name", "mac") if k in b}
+    if d.get("kind") == "firetv":
+        b.pop("keep_on", None)
+        if fields.get("addr"):
+            fields["addr"] = fields["addr"].split(":")[0] + ":8009"
     if "restore" in b and isinstance(b["restore"], dict):
         r = dict(d.get("restore") or {})
         if "enabled" in b["restore"]:
@@ -361,11 +398,35 @@ def r_update_device(h, m, q):
     h._send(200, a.device_view(updated))
 
 
+@route("POST", r"/api/devices/(\w+)/pair")
+def r_pair(h, m, q):
+    """Fire TV pairing. Without a pin: show a 4-digit PIN on the TV. With a pin: verify it and store the token."""
+    a = h.app
+    d = a.require_device(m.group(1))
+    if d.get("kind") != "firetv":
+        raise ApiError(400, "Only a Fire TV is paired this way")
+    host = d["addr"].split(":")[0]
+    pin = (h._json_body().get("pin") or "").strip()
+    if not pin:
+        ok, msg = a.firetv.show_pin(host)
+        if not ok:
+            raise ApiError(502, "The Fire TV did not show a PIN. Check that it is on and awake.")
+        h._send(200, {"ok": True, "output": "A 4-digit PIN is showing on the TV"})
+        return
+    ok, out = a.firetv.verify_pin(host, pin)
+    if not ok:
+        raise ApiError(400, out)
+    a.store.update_device(d["id"], token=out)
+    a.events.add(d["name"], "paired")
+    h._send(200, {"ok": True, "output": "Paired"})
+
+
 @route("DELETE", r"/api/devices/(\w+)")
 def r_delete_device(h, m, q):
     d = h.app.require_device(m.group(1))
     h.app.store.delete_device(d["id"])
-    h.app.adb.disconnect(d["addr"])
+    if d.get("kind") != "firetv":
+        h.app.adb.disconnect(d["addr"])
     h.app.events.add(d["name"], "device removed")
     h._send(200, {"ok": True})
 
@@ -408,7 +469,7 @@ def r_bulk(h, m, q):
 @route("GET", r"/api/devices/(\w+)/info")
 def r_info(h, m, q):
     a = h.app
-    d = a.require_device(m.group(1))
+    d = a.require_adb_device(m.group(1))
     sh = lambda c, t=15: a.adb.shell(d["addr"], c, t)[1]
     props = P.parse_props(sh("getprop"))
     keep = ["ro.product.manufacturer", "ro.product.model", "ro.product.device", "ro.build.version.release",
@@ -430,7 +491,7 @@ def r_info(h, m, q):
 @route("GET", r"/api/devices/(\w+)/inputs")
 def r_inputs(h, m, q):
     a = h.app
-    d = a.require_device(m.group(1))
+    d = a.require_adb_device(m.group(1))
     st = a.monitor.snapshot(d["id"]) or {}
     labels = st.get("labels") or {}
     out = a.adb.shell(d["addr"], "dumpsys tv_input", 20)[1]
@@ -444,7 +505,7 @@ def r_inputs(h, m, q):
 @route("GET", r"/api/devices/(\w+)/packages")
 def r_packages(h, m, q):
     a = h.app
-    d = a.require_device(m.group(1))
+    d = a.require_adb_device(m.group(1))
     flt = (q.get("filter") or ["user"])[0]
     sh = lambda c: P.parse_packages(a.adb.shell(d["addr"], c, 30)[1])
     disabled = set(sh("pm list packages -d"))
@@ -456,7 +517,7 @@ def r_packages(h, m, q):
 @route("POST", r"/api/devices/(\w+)/packages/([\w.]+)")
 def r_package_action(h, m, q):
     a = h.app
-    d = a.require_device(m.group(1))
+    d = a.require_adb_device(m.group(1))
     pkg = m.group(2)
     if not P.SAFE_PKG.match(pkg):
         raise ApiError(400, "invalid package name")
@@ -481,7 +542,7 @@ def r_package_action(h, m, q):
 @route("POST", r"/api/devices/(\w+)/install")
 def r_install(h, m, q):
     a = h.app
-    d = a.require_device(m.group(1))
+    d = a.require_adb_device(m.group(1))
     n = int(h.headers.get("Content-Length") or 0)
     if n <= 0 or n > MAX_APK:
         raise ApiError(413, "APK missing or too large")
@@ -511,7 +572,7 @@ def r_install(h, m, q):
 
 @route("GET", r"/api/devices/(\w+)/screenshot")
 def r_screenshot(h, m, q):
-    d = h.app.require_device(m.group(1))
+    d = h.app.require_adb_device(m.group(1))
     png = h.app.adb.screencap(d["addr"])
     if not png:
         raise ApiError(502, "screenshot failed (device asleep or protected content)")
@@ -522,7 +583,7 @@ def r_screenshot(h, m, q):
 def r_live(h, m, q):
     """Live view: multipart/x-mixed-replace stream of JPEG frames (also works directly in an <img>)."""
     a = h.app
-    d = a.require_device(m.group(1))
+    d = a.require_adb_device(m.group(1))
     ff = livemod.ffmpeg_path()
     if not ff:
         raise ApiError(501, "Live view needs ffmpeg on the server (sudo apt install ffmpeg)")
@@ -582,7 +643,7 @@ def r_live(h, m, q):
 @route("POST", r"/api/devices/(\w+)/shell")
 def r_shell(h, m, q):
     a = h.app
-    d = a.require_device(m.group(1))
+    d = a.require_adb_device(m.group(1))
     cmd = str(h._json_body().get("cmd", "")).strip()
     if not cmd or len(cmd) > 2000:
         raise ApiError(400, "command missing or too long")

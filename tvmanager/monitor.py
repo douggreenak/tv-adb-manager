@@ -15,6 +15,7 @@ from concurrent.futures import ThreadPoolExecutor
 from . import parsers as P
 from . import wol
 from . import keepon
+from .keepalive import probe as net_probe
 
 PROBE = ("(dumpsys power | grep -m1 mWakefulness=; echo ==; "
          "dumpsys tv_input | grep -A1 'SessionState@' | grep inputId; echo ==; "
@@ -114,7 +115,7 @@ class Monitor:
         """Try an ADB reconnect now (used by the keepalive when the TV answers on the network)."""
         st = self._st(dev["id"])
         now = time.time()
-        if st["status"] in ("offline", "unknown") and now - st["last_try"] > 3:
+        if dev.get("kind") != "firetv" and st["status"] in ("offline", "unknown") and now - st["last_try"] > 3:
             st["last_try"] = now
             self.pool.submit(self.adb.connect, dev["addr"])
 
@@ -147,6 +148,8 @@ class Monitor:
         addr, name = dev["addr"], dev["name"]
         now = time.time()
 
+        if dev.get("kind") == "firetv":
+            return self.firetv_cycle(dev, st, now)
         if adb_state == "unauthorized":
             self._set_status(st, name, "unauthorized")
             if now - st["last_try"] > UNAUTH_RETRY:
@@ -197,6 +200,26 @@ class Monitor:
         if st["wake_at"] and now >= st["wake_at"] and awake:
             st["wake_at"] = None
             self._restore(dev, st, inp, top)
+
+    def firetv_cycle(self, dev, st, now):
+        """A Fire TV has no ADB: it is 'on' or 'asleep' by what the manager last sent it, and 'offline' if it
+        does not answer on the network. (It cannot report its own wakefulness.)"""
+        st.update(manufacturer="Amazon", model="Fire TV", android=None)
+        if not dev.get("token"):
+            self._set_status(st, dev["name"], "unauthorized", quiet=True)
+            return
+        if net_probe(dev["addr"], timeout=2.0):
+            st.update(last_seen=now, seen_online=True)
+            self._set_status(st, dev["name"], "asleep" if st.get("assumed_sleep") else "online", quiet=True)
+        else:
+            self._set_status(st, dev["name"], "offline", quiet=True)
+
+    def assume_sleep(self, dev_id, asleep):
+        """Remember what we last told a Fire TV to do."""
+        st = self._st(dev_id)
+        st["assumed_sleep"] = asleep
+        if st["status"] in ("online", "asleep"):
+            st["status"] = "asleep" if asleep else "online"
 
     def keep_on(self, dev, st, force=False):
         """Make sure the TV's own power-off and sleep timers are off (unless turned off for this TV)."""

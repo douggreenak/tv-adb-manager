@@ -93,7 +93,7 @@ server was down at the end time, the sleep still happens when it is back up with
 
 Fire TVs don't offer ADB, so they are added with **Add device → Fire TV** and paired once: the manager shows a 4-digit PIN on the TV and you type it in. After that the card has Wake, Sleep and Home, the Remote tab works (arrows, OK, back, home, play/pause), and calendar schedules wake and sleep it like any other TV. The manager uses the local API the Fire TV phone remote app uses (HTTPS on port 8080, started through port 8009); the pairing token is stored in `data/devices.json`.
 
-- A Fire TV can't report whether it is on or asleep (it answers the same way either way), so the card only says **On the network** or **Offline**, and Fire TVs are left out of the "on / asleep" counts. A schedule always sends the wake once at the start of a block and sleeps it at the end.
+- A Fire TV can't report whether it is on or asleep (it answers the same way either way), so the card only says **On the network** or **Offline**, (pinged every second, and the page refreshes every second while a Fire TV is shown), and Fire TVs are left out of the "on / asleep" counts. A schedule always sends the wake once at the start of a block and sleeps it at the end.
 - Sleep keeps it on the network. The keepalive probes port 8009.
 - Not available: screen view, inputs, apps, install, shell, keep-on, Wake-on-LAN. If the TV stops responding, use **Settings → Pair again**.
 

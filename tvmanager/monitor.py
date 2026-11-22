@@ -53,6 +53,8 @@ def pick_mac(text, addr):
     return found[0][0] if len(found) == 1 else None
 
 
+FIRETV_TIMEOUT = 1.5
+FIRETV_EVERY = 1.0        # seconds between pings of a Fire TV
 KEEP_ON_RECHECK = 600.0     # re-read the TV's timers this often (its own menus can rewrite them)
 WAKE_SETTLE = 3.0       # seconds after waking before we look at what the TV did by itself
 CONNECT_RETRY = 10.0
@@ -84,6 +86,7 @@ class Monitor:
     def start(self):
         self._thread = threading.Thread(target=self._loop, daemon=True, name="monitor")
         self._thread.start()
+        threading.Thread(target=self._firetv_loop, daemon=True, name="firetv-ping").start()
 
     def stop(self):
         self._stop.set()
@@ -97,6 +100,22 @@ class Monitor:
             self.last_tick = time.time()
             self._stop.wait(self.poll)
 
+    def _firetv_loop(self):
+        """Fire TVs have no ADB, so their 'on the network' status is a ping of its own, once a second."""
+        while not self._stop.is_set():
+            t0 = time.time()
+            try:
+                self.firetv_tick()
+            except Exception as e:
+                self.events.add("-", "fire tv ping error: %r" % e, "error")
+            self._stop.wait(max(0.0, FIRETV_EVERY - (time.time() - t0)))
+
+    def firetv_tick(self):
+        devs = [d for d in self.store.devices() if d.get("kind") == "firetv"]
+        now = time.time()
+        for d, _ in zip(devs, self.pool.map(lambda d: self.firetv_cycle(d, self._st(d["id"]), now), devs)):
+            pass
+
     def tick(self):
         adb_states = self.adb.devices()
         devs = self.store.devices()
@@ -105,6 +124,9 @@ class Monitor:
             for k in [k for k in self.states if k not in ids]:
                 del self.states[k]
         for d in devs:
+            if d.get("kind") == "firetv":
+                self._st(d["id"])             # its status comes from firetv_tick
+                continue
             with self.lock:
                 if d["id"] in self.inflight:
                     continue
@@ -208,7 +230,7 @@ class Monitor:
         if not dev.get("token"):
             self._set_status(st, dev["name"], "unauthorized", quiet=True)
             return
-        if net_probe(dev["addr"], timeout=2.0):
+        if net_probe(dev["addr"], timeout=FIRETV_TIMEOUT):
             st.update(last_seen=now, seen_online=True)
             self._set_status(st, dev["name"], "online", quiet=True)
         else:

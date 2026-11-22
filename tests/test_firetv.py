@@ -145,3 +145,25 @@ class RetryTests(unittest.TestCase):
         st, body = tv._call("h", "POST", "/x", "T", sleep=lambda s: None)
         self.assertEqual(st, 0)
         self.assertFalse(tv.press("h", "T", "KEYCODE_HOME")[0])
+
+
+class PingTests(unittest.TestCase):
+    def test_firetv_tick_pings_fire_tvs_only_and_updates_status(self):
+        import tvmanager.monitor as M
+        with tempfile.TemporaryDirectory() as tmp:
+            app = App(tmp, WEB, adb=FakeAdb(), env_password="x", start_threads=False, firetv=FakeTV())
+            f = app.store.add_device("F", "10.0.0.9", "", "firetv")
+            app.store.update_device(f["id"], token="T")
+            a = app.store.add_device("A", "10.0.0.8", "")
+            seen, orig = [], M.net_probe
+            try:
+                M.net_probe = lambda addr, timeout=2.0: seen.append(addr) or True
+                app.monitor.firetv_tick()
+                self.assertEqual(seen, ["10.0.0.9:8009"])
+                self.assertEqual(app.monitor.snapshot(f["id"])["status"], "online")
+                self.assertIsNone(app.monitor.snapshot(a["id"]))
+                M.net_probe = lambda addr, timeout=2.0: False
+                app.monitor.firetv_tick()
+                self.assertEqual(app.monitor.snapshot(f["id"])["status"], "offline")
+            finally:
+                M.net_probe = orig

@@ -218,7 +218,9 @@ async function start() {
   renderShell();
   await refresh();
   clearInterval(S.timer);
-  S.timer = setInterval(() => { if (!document.hidden) tick(); }, 3000);
+  let last = 0;      // refresh every second while a Fire TV is shown (it is pinged each second), otherwise every 3 s
+  S.timer = setInterval(() => { const gap = S.devices.some(d => d.kind === "firetv") ? 900 : 2900;
+    if (!document.hidden && Date.now() - last >= gap) { last = Date.now(); tick(); } }, 1000);
 }
 
 const NAV = [["devices", "Devices", "tv"], ["schedules", "Schedules", "schedule"], ["events", "Activity", "list"], ["settings", "Settings", "settings"]];
